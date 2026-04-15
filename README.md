@@ -35,7 +35,7 @@ Cine Time bridges the gap between **intuitive ticket booking** and **real-time t
   Quickly clear and reset all bookings for new show schedules.
 
 
-## 🧰 Tech Stack
+## Tech Stack
 
  Layer       Technology                                             
 
@@ -128,8 +128,3 @@ This project is licensed under the MIT License.
 
 Developed by **Vidhyadharan RP**
 Feel free to connect and provide feedback.
-
-
-## ⭐ Acknowledgment
-
-If you found this project useful or interesting, consider giving it a star ⭐ on GitHub!

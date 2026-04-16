@@ -126,5 +126,5 @@ This project is licensed under the MIT License.
 
 ## Author
 
-Developed by **Vidhyadharan RP**
+Developed by **Vidhyadharan RP & Srijith S**
 Feel free to connect and provide feedback.

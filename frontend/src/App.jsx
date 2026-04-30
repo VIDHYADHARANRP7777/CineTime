@@ -315,9 +315,20 @@ body {
 .btn-danger { background:#FFF0F0; color:var(--accent); border:2px solid rgba(255,55,95,.2); box-shadow:none; }
 .btn-danger:hover { background:var(--accent); color:#fff; }
 `;
-
+const handlePayment = async () => {
+    const response = await axios.post('https://cinetime-bq7l.onrender.com', {
+        amount: totalAmount,
+        username: currentUser,
+        movieName: selectedMovie
+    });
+    
+    // Set this to a state variable and display it in an <img> tag
+    setQrImage(response.data.qrCode); 
+};
 /* ─────────────────────────── APP ─────────────────────────── */
 function App() {
+  const [qrImage, setQrImage] = useState(null);
+  const [isPaying, setIsPaying] = useState(false);
   const [view, setView] = useState('login');
   const [user, setUser] = useState(null);
   const [movie, setMovie] = useState(null);
@@ -665,7 +676,7 @@ function App() {
     </>
   );
 
-  /* PAYMENT */
+/* PAYMENT */
   if (view === 'pay') return (
     <>
       <style>{G}</style>
@@ -675,37 +686,56 @@ function App() {
           <div className="pay-h">UPI Checkout</div>
           <div className="pay-sh">{movie?.title} · {selectedTime}</div>
 
-          <div className="pay-table">
-            <div className="pay-row">
-              <span className="pay-lbl">Seats ({selectedSeats.length})</span>
-              <span className="pay-val">{selectedSeats.length} × ₹150</span>
+          {/* QR Code Display Area */}
+          {qrImage ? (
+            <div className="qr-container" style={{ textAlign: 'center', padding: '20px' }}>
+              <img src={qrImage} alt="Payment QR" style={{ width: '200px', borderRadius: '10px' }} />
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>Scan to pay ₹{selectedSeats.length * 150}</p>
+              
+              <button className="btn btn-green" onClick={async () => {
+                // Confirm booking AFTER they scan/pay
+                await axios.post(`${API}/book`, {
+                  username: user, movieName: movie.title, timing: selectedTime,
+                  selectedSeats, amount: selectedSeats.length * 150, phone: form.phone
+                });
+                alert("✅ Payment Verified & Booked!");
+                setQrImage(null);
+                setView('gallery'); 
+                setSelectedSeats([]);
+              }}>I have paid →</button>
             </div>
-            <div className="pay-row">
-              <span className="pay-lbl">Convenience fee</span>
-              <span className="pay-val">₹0</span>
-            </div>
-            <div className="pay-row pay-row-total">
-              <span className="pay-lbl">Total payable</span>
-              <span className="pay-val">₹{selectedSeats.length * 150}</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="pay-table">
+                <div className="pay-row">
+                  <span className="pay-lbl">Seats ({selectedSeats.length})</span>
+                  <span className="pay-val">{selectedSeats.length} × ₹150</span>
+                </div>
+                <div className="pay-row pay-row-total">
+                  <span className="pay-lbl">Total payable</span>
+                  <span className="pay-val">₹{selectedSeats.length * 150}</span>
+                </div>
+              </div>
 
-          <div className="upi-inp-wrap">
-            <span className="inp-ico" style={{ left: 15, top: '50%' }}>💰</span>
-            <input className="upi-inp" placeholder="UPI ID / Card number" />
-          </div>
-
-          <button className="btn btn-green" onClick={async () => {
-            await axios.post(`${API}/book`, {
-              username: user, movieName: movie.title, timing: selectedTime,
-              selectedSeats, amount: selectedSeats.length * 150, phone: form.phone
-            });
-            alert("✅ Booked Successfully!");
-            setView('gallery'); setSelectedSeats([]);
-          }}>Pay ₹{selectedSeats.length * 150} →</button>
+              <button className="btn btn-green" onClick={async () => {
+                try {
+                  const res = await axios.post(`${API}/payment/generate-qr`, {
+                    amount: selectedSeats.length * 150,
+                    username: user,
+                    movieName: movie.title
+                  });
+                  setQrImage(res.data.qrCode);
+                } catch (err) {
+                  alert("Error generating QR code");
+                }
+              }}>Generate QR Code →</button>
+            </>
+          )}
 
           <div style={{ height: 10 }} />
-          <button className="btn btn-grey" onClick={() => setView('seats')}>Go back</button>
+          <button className="btn btn-grey" onClick={() => { setQrImage(null); setView('seats'); }}>
+            Go back
+          </button>
         </div>
       </div>
     </>

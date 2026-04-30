@@ -1,13 +1,23 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const QRCode = require('qrcode');
+require('dotenv').config(); // 1. Load environment variables
 
 const app = express();
-app.use(cors());
+
+// 2. CONSOLIDATED CORS (Keep only this one)
+app.use(cors({
+  origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 app.use(express.json());
 
-// --- DATABASE CONNECTION ---
-const mongoURI = "mongodb+srv://admin:Vidhya123@cluster0.g2i679h.mongodb.net/?appName=Cluster0"; 
+// 3. SECURE DATABASE CONNECTION
+// Use the Key 'MONGO_URI' that you set in Render's Environment Variables
+const mongoURI = process.env.MONGO_URI || "mongodb+srv://admin:Vidhya123@cluster0.g2i679h.mongodb.net/?appName=Cluster0"; 
 
 mongoose.connect(mongoURI)
     .then(() => console.log("✅ Cine Time Database Connected"))
@@ -54,6 +64,21 @@ app.post('/api/login', async (req, res) => {
     else res.status(401).json({ error: "Invalid credentials" });
 });
 
+// --- PAYMENT INTEGRATION ---
+app.post('/api/payment/generate-qr', async (req, res) => {
+    const { amount, movieName } = req.body;
+    try {
+        const upiId = "yourname@upi"; // Change to your real UPI ID for actual testing
+        const transactionNote = `CineTime Booking - ${movieName}`;
+        const upiUrl = `upi://pay?pa=${upiId}&pn=CineTime&am=${amount}&tn=${transactionNote}&cu=INR`;
+
+        const qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
+        res.json({ qrCode: qrCodeDataUrl, message: "Scan with any UPI App to pay" });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to generate QR code" });
+    }
+});
+
 // --- BOOKING & SYNC ROUTES ---
 app.get('/api/booked-seats/:movieName/:timing', async (req, res) => {
     const { movieName, timing } = req.params;
@@ -63,7 +88,6 @@ app.get('/api/booked-seats/:movieName/:timing', async (req, res) => {
     res.json(booked);
 });
 
-// NEW: ADMIN VISUAL DATA ROUTE
 app.get('/api/admin/detailed-seats/:movieName/:timing', async (req, res) => {
     const { movieName, timing } = req.params;
     const tickets = await Ticket.find({ movieName, timing });
@@ -77,9 +101,11 @@ app.get('/api/admin/detailed-seats/:movieName/:timing', async (req, res) => {
 });
 
 app.post('/api/book', async (req, res) => {
-    const ticket = new Ticket(req.body);
-    await ticket.save();
-    res.status(201).json({ message: "Booked" });
+    try {
+        const ticket = new Ticket(req.body);
+        await ticket.save();
+        res.status(201).json({ message: "Booked" });
+    } catch (err) { res.status(500).json({ error: "Booking failed" }); }
 });
 
 app.get('/api/history/:username', async (req, res) => {
@@ -93,4 +119,6 @@ app.delete('/api/admin/refresh/:movieName/:timing', async (req, res) => {
     res.json({ message: "Show reset successfully" });
 });
 
-app.listen(5000, () => console.log("🚀 Server running on port 5000"));
+// 4. DYNAMIC PORT
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

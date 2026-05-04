@@ -680,8 +680,7 @@ function App() {
   );
   
 
-/* PAYMENT */
-  /* PAYMENT VIEW */
+/* PAYMENT VIEW */
 if (view === 'pay') return (
   <>
     <style>{G}</style>
@@ -694,7 +693,6 @@ if (view === 'pay') return (
         {/* QR Code Display Area */}
         {qrImage ? (
           <div className="qr-container" style={{ textAlign: 'center', padding: '20px' }}>
-            {/* The src={qrImage} works because the backend sends a Base64 string */}
             <img 
               src={qrImage} 
               alt="Payment QR" 
@@ -706,6 +704,7 @@ if (view === 'pay') return (
             
             <button className="btn btn-green" onClick={async () => {
               try {
+                // This sends the booking to the database AFTER payment
                 await axios.post(`${API}/book`, {
                   username: user, 
                   movieName: movie.title, 
@@ -738,21 +737,27 @@ if (view === 'pay') return (
 
             <button className="btn btn-green" onClick={async () => {
               try {
+                console.log("Calling QR API...");
+                // CRITICAL: amount and movieName must match backend req.body
                 const res = await axios.post(`${API}/payment/generate-qr`, {
                   amount: selectedSeats.length * 150,
-                  username: user,
                   movieName: movie.title
                 });
                 
-                // CRITICAL: Ensure backend sends { qrCode: "data:image/png;base64..." }
-                if (res.data.qrCode) {
+                // Matches res.json({ qrCode: qrCodeImage }) from backend
+                if (res.data && res.data.qrCode) {
                   setQrImage(res.data.qrCode);
                 } else {
-                  alert("Backend did not return a QR code.");
+                  alert("Error: Backend did not send the QR image.");
                 }
               } catch (err) {
                 console.error("QR Error:", err);
-                alert("Error generating QR code. Check your backend logs.");
+                const status = err.response?.status;
+                if (status === 404) {
+                  alert("Error 404: The server route doesn't exist. Make sure you pushed the backend code to Render.");
+                } else {
+                  alert("Error generating QR code. Check backend logs.");
+                }
               }
             }}>Generate QR Code →</button>
           </>
@@ -769,3 +774,4 @@ if (view === 'pay') return (
 }
 
 export default App;
+

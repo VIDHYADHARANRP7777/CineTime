@@ -6,29 +6,39 @@ require('dotenv').config(); // 1. Load environment variables
 
 const app = express();
 
-const qrcode = require('qrcode');
-app.post('/api/payment/generate-qr', async (req, res) => {
-  try {
-    const { amount } = req.body;
-    const qr = await qrcode.toDataURL(`upi://pay?pa=YOUR_ID@upi&am=${amount}`);
-    res.json({ qrCode: qr });
-  } catch (err) {
-    res.status(500).json({ error: "Fail" });
-  }
-});
-
-
-// 2. CONSOLIDATED CORS (Keep only this one)
+// --- CRITICAL FIX: MIDDLEWARE MUST COME BEFORE ROUTES ---
 app.use(cors({
-  origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+    origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json()); // This allows the server to read the 'amount' and 'movieName' sent by frontend
 
+// 1. Make sure this requirement is at the very top of your server.js
+// 1. Change this line at the top of server.js to be lowercase
+const qrcode = require('qrcode'); 
+
+// 2. Update the route to ensure it sends the right 'key'
+app.post('/api/payment/generate-qr', async (req, res) => {
+  try {
+    const { amount, movieName } = req.body;
+    
+    // Replace with your actual UPI ID
+    const upiId = "9876543210@ybl"; 
+    const upiLink = `upi://pay?pa=${upiId}&pn=CineTime&am=${amount}&tn=Booking-${movieName}`;
+    
+    const qrCodeImage = await qrcode.toDataURL(upiLink);
+    
+    // This key 'qrCode' MUST match your res.data.qrCode in React
+    res.json({ qrCode: qrCodeImage }); 
+    
+  } catch (err) {
+    console.error("QR Generation Error:", err);
+    res.status(500).json({ error: "Failed to generate QR" });
+  }
+});
 // 3. SECURE DATABASE CONNECTION
-// Use the Key 'MONGO_URI' that you set in Render's Environment Variables
 const mongoURI = process.env.MONGO_URI || "mongodb+srv://admin:Vidhya123@cluster0.g2i679h.mongodb.net/?appName=Cluster0"; 
 
 mongoose.connect(mongoURI)
@@ -75,8 +85,6 @@ app.post('/api/login', async (req, res) => {
     if (user) res.json({ user: user.username, role: "user" });
     else res.status(401).json({ error: "Invalid credentials" });
 });
-
-
 
 // --- BOOKING & SYNC ROUTES ---
 app.get('/api/booked-seats/:movieName/:timing', async (req, res) => {

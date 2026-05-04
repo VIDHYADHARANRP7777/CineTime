@@ -6,6 +6,27 @@ require('dotenv').config(); // 1. Load environment variables
 
 const app = express();
 
+const qrcode = require('qrcode');
+
+// Add this route to your server.js
+app.post('/api/payment/generate-qr', async (req, res) => {
+  try {
+    const { amount, username, movieName } = req.body;
+
+    // 1. Create the UPI link (Replace with your actual UPI ID)
+    const upiLink = `upi://pay?pa=yourname@upi&pn=CineTime&am=${amount}&tn=Booking-${movieName}`;
+
+    // 2. Convert that link into a QR image string
+    const qrCodeImage = await qrcode.toDataURL(upiLink);
+
+    // 3. Send it back to the frontend
+    res.json({ qrCode: qrCodeImage });
+  } catch (err) {
+    console.error("QR Error:", err);
+    res.status(500).json({ error: "Failed to generate QR" });
+  }
+});
+
 // 2. CONSOLIDATED CORS (Keep only this one)
 app.use(cors({
   origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 
@@ -64,20 +85,7 @@ app.post('/api/login', async (req, res) => {
     else res.status(401).json({ error: "Invalid credentials" });
 });
 
-// --- PAYMENT INTEGRATION ---
-app.post('/api/payment/generate-qr', async (req, res) => {
-    const { amount, movieName } = req.body;
-    try {
-        const upiId = "yourname@upi"; // Change to your real UPI ID for actual testing
-        const transactionNote = `CineTime Booking - ${movieName}`;
-        const upiUrl = `upi://pay?pa=${upiId}&pn=CineTime&am=${amount}&tn=${transactionNote}&cu=INR`;
 
-        const qrCodeDataUrl = await QRCode.toDataURL(upiUrl);
-        res.json({ qrCode: qrCodeDataUrl, message: "Scan with any UPI App to pay" });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to generate QR code" });
-    }
-});
 
 // --- BOOKING & SYNC ROUTES ---
 app.get('/api/booked-seats/:movieName/:timing', async (req, res) => {

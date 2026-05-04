@@ -8,7 +8,8 @@ const app = express();
 
 const qrcode = require('qrcode'); // Ensure this is at the top
 
-app.post('/api/payment/generate-qr', async (req, res) => {
+app.post('/api/payment/generate-qr', async (
+    req, res) => {
     try {
         const { amount, username, movieName } = req.body;
         // Generate a UPI string

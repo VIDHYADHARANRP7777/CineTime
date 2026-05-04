@@ -8,10 +8,14 @@ const app = express();
 
 // --- 1. MIDDLEWARE (MUST BE FIRST — BEFORE ALL ROUTES) ---
 app.use(cors({
-    origin: [
-        "https://cine-time-rg153xb50-vidhyadharanrp7777s-projects.vercel.app",
-        "http://localhost:5173"
-    ],
+    origin: function(origin, callback) {
+        // Allow all vercel.app domains + localhost
+        if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
 }));

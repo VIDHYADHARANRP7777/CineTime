@@ -6,27 +6,23 @@ require('dotenv').config(); // 1. Load environment variables
 
 const app = express();
 
-const qrcode = require('qrcode');
+const qrcode = require('qrcode'); // Ensure this is at the top
 
-// Add this route to your server.js
 app.post('/api/payment/generate-qr', async (req, res) => {
-  try {
-    const { amount, username, movieName } = req.body;
-
-    // 1. Create the UPI link (Replace with your actual UPI ID)
-    const upiLink = `upi://pay?pa=yourname@upi&pn=CineTime&am=${amount}&tn=Booking-${movieName}`;
-
-    // 2. Convert that link into a QR image string
-    const qrCodeImage = await qrcode.toDataURL(upiLink);
-
-    // 3. Send it back to the frontend
-    res.json({ qrCode: qrCodeImage });
-  } catch (err) {
-    console.error("QR Error:", err);
-    res.status(500).json({ error: "Failed to generate QR" });
-  }
+    try {
+        const { amount, username, movieName } = req.body;
+        // Generate a UPI string
+        const upiLink = `upi://pay?pa=YOUR_UPI_ID@okaxis&pn=CineTime&am=${amount}&tn=${movieName}`;
+        
+        // Convert to QR Image
+        const qrCodeImage = await qrcode.toDataURL(upiLink);
+        
+        res.json({ qrCode: qrCodeImage });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "QR Generation Failed" });
+    }
 });
-
 // 2. CONSOLIDATED CORS (Keep only this one)
 app.use(cors({
   origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 

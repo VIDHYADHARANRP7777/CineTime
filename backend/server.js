@@ -6,24 +6,18 @@ require('dotenv').config(); // 1. Load environment variables
 
 const app = express();
 
-const qrcode = require('qrcode'); // Ensure this is at the top
-
-app.post('/api/payment/generate-qr', async (
-    req, res) => {
-    try {
-        const { amount, username, movieName } = req.body;
-        // Generate a UPI string
-        const upiLink = `upi://pay?pa=YOUR_UPI_ID@okaxis&pn=CineTime&am=${amount}&tn=${movieName}`;
-        
-        // Convert to QR Image
-        const qrCodeImage = await qrcode.toDataURL(upiLink);
-        
-        res.json({ qrCode: qrCodeImage });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "QR Generation Failed" });
-    }
+const qrcode = require('qrcode');
+app.post('/api/payment/generate-qr', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const qr = await qrcode.toDataURL(`upi://pay?pa=YOUR_ID@upi&am=${amount}`);
+    res.json({ qrCode: qr });
+  } catch (err) {
+    res.status(500).json({ error: "Fail" });
+  }
 });
+
+
 // 2. CONSOLIDATED CORS (Keep only this one)
 app.use(cors({
   origin: ["https://cine-time-r48yog7u8-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 

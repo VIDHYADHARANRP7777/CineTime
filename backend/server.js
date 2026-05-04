@@ -1,56 +1,31 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const qrcode = require('qrcode'); // Ensure this is lowercase to match usage
-require('dotenv').config(); // 1. Load environment variables
+const qrcode = require('qrcode');
+require('dotenv').config();
 
 const app = express();
 
-// --- 1. MIDDLEWARE (MUST BE BEFORE ROUTES TO AVOID 404/400) ---
+// --- 1. MIDDLEWARE (MUST BE FIRST — BEFORE ALL ROUTES) ---
 app.use(cors({
-    origin: ["https://cine-time-rg153xb50-vidhyadharanrp7777s-projects.vercel.app", "http://localhost:5173"], 
+    origin: [
+        "https://cine-time-rg153xb50-vidhyadharanrp7777s-projects.vercel.app",
+        "http://localhost:5173"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
 }));
 
-app.use(express.json()); // Essential to read 'amount' and 'movieName' from frontend
+app.use(express.json()); // ✅ CRITICAL: Must be here before any route
 
-// --- 2. QR GENERATION ROUTE ---
-app.post('/api/payment/generate-qr', async (req, res) => {
-  try {
-    const { amount, movieName } = req.body;
-
-    // Debug log to check incoming data in Render Logs
-    console.log("QR API HIT:", amount, movieName);
-
-    if (!amount || !movieName) {
-      return res.status(400).json({ error: "Missing amount or movieName" });
-    }
-
-    // Your actual UPI ID
-    const upiId = "9876543210@ybl"; 
-    const upiLink = `upi://pay?pa=${upiId}&pn=CineTime&am=${amount}&tn=${encodeURIComponent(`Booking-${movieName}`)}`;
-
-    // Creates the base64 image string
-    const qrCodeImage = await qrcode.toDataURL(upiLink);
-    
-    // Key 'qrCode' matches your frontend 'res.data.qrCode'
-    res.json({ qrCode: qrCodeImage });
-
-  } catch (err) {
-    console.error("QR Generation Error:", err);
-    res.status(500).json({ error: "Failed to generate QR" });
-  }
-});
-
-// --- 3. DATABASE CONNECTION ---
-const mongoURI = process.env.MONGO_URI || "mongodb+srv://admin:Vidhya123@cluster0.g2i679h.mongodb.net/?appName=Cluster0"; 
+// --- 2. DATABASE CONNECTION ---
+const mongoURI = process.env.MONGO_URI || "mongodb+srv://admin:Vidhya123@cluster0.g2i679h.mongodb.net/?appName=Cluster0";
 
 mongoose.connect(mongoURI)
     .then(() => console.log("✅ Cine Time Database Connected"))
     .catch(err => console.error("❌ Connection Error:", err));
 
-// --- 4. SCHEMAS ---
+// --- 3. SCHEMAS ---
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -72,23 +47,56 @@ const ticketSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
+// --- 4. QR GENERATION ROUTE ---
+// ✅ Now placed AFTER express.json() so req.body is always parsed
+app.post('/api/payment/generate-qr', async (req, res) => {
+    try {
+        const { amount, movieName } = req.body;
+
+        console.log("QR API HIT — amount:", amount, "| movieName:", movieName);
+
+        if (!amount || !movieName) {
+            return res.status(400).json({ error: "Missing amount or movieName" });
+        }
+
+        const upiId = process.env.UPI_ID || "9876543210@ybl"; // Use env var for safety
+        const upiLink = `upi://pay?pa=${upiId}&pn=CineTime&am=${amount}&tn=${encodeURIComponent(`Booking-${movieName}`)}`;
+
+        const qrCodeImage = await qrcode.toDataURL(upiLink);
+
+        res.json({ qrCode: qrCodeImage }); // ✅ matches frontend res.data.qrCode
+
+    } catch (err) {
+        console.error("QR Generation Error:", err);
+        res.status(500).json({ error: "Failed to generate QR code" });
+    }
+});
+
 // --- 5. AUTH ROUTES ---
 app.post('/api/register', async (req, res) => {
     try {
         const user = new User(req.body);
         await user.save();
         res.status(201).json({ message: "Success" });
-    } catch (err) { res.status(400).json({ error: "Username already exists" }); }
+    } catch (err) {
+        res.status(400).json({ error: "Username already exists" });
+    }
 });
 
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
+
+    // Admin hardcoded check
     if (username === "admin" && password === "7777") {
         return res.json({ user: "admin", role: "admin" });
     }
+
     const user = await User.findOne({ username, password });
-    if (user) res.json({ user: user.username, role: "user" });
-    else res.status(401).json({ error: "Invalid credentials" });
+    if (user) {
+        res.json({ user: user.username, role: "user" });
+    } else {
+        res.status(401).json({ error: "Invalid credentials" });
+    }
 });
 
 // --- 6. BOOKING & HISTORY ROUTES ---
@@ -105,7 +113,9 @@ app.post('/api/book', async (req, res) => {
         const ticket = new Ticket(req.body);
         await ticket.save();
         res.status(201).json({ message: "Booked" });
-    } catch (err) { res.status(500).json({ error: "Booking failed" }); }
+    } catch (err) {
+        res.status(500).json({ error: "Booking failed" });
+    }
 });
 
 app.get('/api/history/:username', async (req, res) => {
@@ -127,7 +137,10 @@ app.get('/api/admin/detailed-seats/:movieName/:timing', async (req, res) => {
 });
 
 app.delete('/api/admin/refresh/:movieName/:timing', async (req, res) => {
-    await Ticket.deleteMany({ movieName: req.params.movieName, timing: req.params.timing });
+    await Ticket.deleteMany({
+        movieName: req.params.movieName,
+        timing: req.params.timing
+    });
     res.json({ message: "Show reset successfully" });
 });
 

@@ -680,7 +680,7 @@ function App() {
   );
   
 
-/* PAYMENT VIEW */
+//* PAYMENT VIEW */
 if (view === 'pay') return (
   <>
     <style>{G}</style>
@@ -690,39 +690,52 @@ if (view === 'pay') return (
         <div className="pay-h">UPI Checkout</div>
         <div className="pay-sh">{movie?.title} · {selectedTime}</div>
 
-        {/* QR Code Display Area */}
+        {/* QR Code Display Area — shown after QR is generated */}
         {qrImage ? (
           <div className="qr-container" style={{ textAlign: 'center', padding: '20px' }}>
-            <img 
-              src={qrImage} 
-              alt="Payment QR" 
-              style={{ width: '200px', borderRadius: '10px', border: '5px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} 
+            <img
+              src={qrImage}
+              alt="Payment QR"
+              style={{
+                width: '200px',
+                borderRadius: '10px',
+                border: '5px solid white',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+              }}
             />
             <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#333', marginTop: '10px' }}>
               Scan to pay ₹{selectedSeats.length * 150}
             </p>
-            
-            <button className="btn btn-green" onClick={async () => {
-              try {
-                // This sends the booking to the database AFTER payment
-                await axios.post(`${API}/book`, {
-                  username: user, 
-                  movieName: movie.title, 
-                  timing: selectedTime,
-                  selectedSeats, 
-                  amount: selectedSeats.length * 150, 
-                  phone: form.phone
-                });
-                alert("✅ Payment Verified & Booked!");
-                setQrImage(null);
-                setView('gallery'); 
-                setSelectedSeats([]);
-              } catch (err) {
-                alert("Booking failed. Please try again.");
-              }
-            }}>I have paid →</button>
+
+            {/* ✅ "I have paid" button — saves booking to DB after payment */}
+            <button
+              className="btn btn-green"
+              onClick={async () => {
+                try {
+                  await axios.post(`${API}/book`, {
+                    username: user,
+                    movieName: movie.title,
+                    timing: selectedTime,
+                    selectedSeats,
+                    amount: selectedSeats.length * 150,
+                    phone: form.phone
+                  });
+                  alert("✅ Payment Verified & Booked!");
+                  setQrImage(null);
+                  setView('gallery');
+                  setSelectedSeats([]);
+                } catch (err) {
+                  console.error("Booking Error:", err);
+                  alert("❌ Booking failed. Please try again.");
+                }
+              }}
+            >
+              I have paid →
+            </button>
           </div>
+
         ) : (
+          /* Bill summary — shown before QR is generated */
           <>
             <div className="pay-table">
               <div className="pay-row">
@@ -735,43 +748,77 @@ if (view === 'pay') return (
               </div>
             </div>
 
-            <button className="btn btn-green" onClick={async () => {
-              try {
-                console.log("Calling QR API...");
-                // CRITICAL: amount and movieName must match backend req.body
-                const res = await axios.post(`${API}/payment/generate-qr`, {
-                  amount: selectedSeats.length * 150,
-                  movieName: movie.title
-                });
-                
-                // Matches res.json({ qrCode: qrCodeImage }) from backend
-                if (res.data && res.data.qrCode) {
-                  setQrImage(res.data.qrCode);
-                } else {
-                  alert("Error: Backend did not send the QR image.");
+            {/* ✅ Generate QR button — calls backend correctly */}
+            <button
+              className="btn btn-green"
+              onClick={async () => {
+                // Guard: ensure seats are selected
+                if (!selectedSeats || selectedSeats.length === 0) {
+                  alert("⚠️ No seats selected. Please go back and select seats.");
+                  return;
                 }
-              } catch (err) {
-                console.error("QR Error:", err);
-                const status = err.response?.status;
-                if (status === 404) {
-                  alert("Error 404: The server route doesn't exist. Make sure you pushed the backend code to Render.");
-                } else {
-                  alert("Error generating QR code. Check backend logs.");
+
+                try {
+                  console.log("Calling QR API with:", {
+                    amount: selectedSeats.length * 150,
+                    movieName: movie.title
+                  });
+
+                  // ✅ API base URL must include /api — e.g. https://your-backend.onrender.com/api
+                  const res = await axios.post(`${API}/payment/generate-qr`, {
+                    amount: selectedSeats.length * 150,  // matches backend req.body.amount
+                    movieName: movie.title               // matches backend req.body.movieName
+                  });
+
+                  // ✅ matches backend: res.json({ qrCode: qrCodeImage })
+                  if (res.data && res.data.qrCode) {
+                    setQrImage(res.data.qrCode);
+                  } else {
+                    alert("❌ Server responded but did not return a QR image. Check backend logs.");
+                  }
+
+                } catch (err) {
+                  console.error("QR Generation Error:", err);
+
+                  const status = err.response?.status;
+                  const message = err.response?.data?.error || "Unknown error";
+
+                  if (status === 404) {
+                    alert("❌ Error 404: Route not found.\nMake sure your backend is deployed and the API URL is correct.");
+                  } else if (status === 400) {
+                    alert(`❌ Error 400: Bad request — ${message}\nCheck that amount and movieName are being sent correctly.`);
+                  } else if (status === 500) {
+                    alert(`❌ Error 500: Server error — ${message}\nCheck your Render backend logs.`);
+                  } else if (!err.response) {
+                    alert("❌ Network error: Could not reach the server.\nCheck if your backend is running on Render.");
+                  } else {
+                    alert(`❌ Unexpected error (${status}): ${message}`);
+                  }
                 }
-              }
-            }}>Generate QR Code →</button>
+              }}
+            >
+              Generate QR Code →
+            </button>
           </>
         )}
 
         <div style={{ height: 10 }} />
-        <button className="btn btn-grey" onClick={() => { setQrImage(null); setView('seats'); }}>
-          Go back
+
+        {/* Go back button — also clears QR if already shown */}
+        <button
+          className="btn btn-grey"
+          onClick={() => {
+            setQrImage(null);
+            setView('seats');
+          }}
+        >
+          ← Go back
         </button>
+
       </div>
     </div>
   </>
-);
-}
+);}
 
 export default App;
 

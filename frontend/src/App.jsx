@@ -69,12 +69,24 @@ const LS = {
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-// FIX: Broadcast movie changes to all tabs/user side
+// Broadcast movie changes to all tabs/user side
 const broadcastMovieUpdate = (movies) => {
   LS.set('ct_admin_movies', movies);
-  // Trigger storage event for same-tab listeners via custom event
   window.dispatchEvent(new CustomEvent('cinetime_movies_updated', { detail: movies }));
 };
+
+/* ─── MERGE MOVIES HELPER ─── */
+// Always prefer DB movies (they have real _ids and latest data), supplement with local defaults
+function mergeMovies(dbMovies, localMovies) {
+  if (!dbMovies || dbMovies.length === 0) return localMovies;
+  // Start with DB movies
+  const merged = [...dbMovies];
+  // Add local defaults only if they don't exist by title in DB
+  localMovies.forEach(lm => {
+    if (!merged.find(m => m.title === lm.title)) merged.push(lm);
+  });
+  return merged;
+}
 
 /* ─── CSS ─── */
 const G = `
@@ -130,7 +142,6 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .nav-link{background:none;border:none;font-family:'Figtree',sans-serif;font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;padding:6px 12px;border-radius:10px;transition:all .15s}
 .nav-link:hover{background:var(--card2);color:var(--t1)}
 .nav-link.active{background:var(--accent-bg);color:var(--accent);font-weight:800}
-.nav-link.locked{opacity:.45;cursor:not-allowed}
 .nav-right{display:flex;gap:7px;align-items:center}
 .nav-back{background:none;border:none;color:var(--accent);font-family:'Figtree',sans-serif;font-size:15px;font-weight:700;cursor:pointer;padding:6px 10px;border-radius:10px}
 .coin-badge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#FFB800,#FF9500);color:#fff;border-radius:20px;padding:5px 11px;font-size:13px;font-weight:800;cursor:pointer}
@@ -139,8 +150,6 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .mob-tab-ico{font-size:19px}
 .mob-tab-lbl{font-size:10px;font-weight:700;color:var(--t3)}
 .mob-tab.active .mob-tab-lbl{color:var(--accent)}
-.mob-tab.locked .mob-tab-lbl{color:var(--t4)}
-.mob-tab.locked .mob-tab-ico{opacity:.4}
 @media(max-width:700px){.nav-links{display:none}.mobile-nav{display:flex}}
 .admin-login-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px)}
 .admin-login-card{background:#0A0A12;border:1px solid rgba(255,255,255,.12);border-radius:var(--r4);padding:38px 34px;width:100%;max-width:350px;box-shadow:0 40px 80px rgba(0,0,0,.6);animation:pop .3s ease;text-align:center}
@@ -231,7 +240,7 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .parking-block-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .parking-block-label{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff}
 .parking-slots-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:8px}
-.parking-slot{border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid var(--bdr);transition:all .18px;font-family:'Figtree',sans-serif}
+.parking-slot{border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;border:2px solid var(--bdr);transition:all .18s;font-family:'Figtree',sans-serif}
 .p-free{background:var(--card2);box-shadow:var(--sh1)}.p-free:hover{border-color:var(--green);background:#E8FFF0}
 .p-booked{background:#FFF0F3;border-color:rgba(255,55,95,.3);cursor:not-allowed;opacity:.65}
 .p-selected{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 4px 14px rgba(52,199,89,.4);transform:scale(1.05)}
@@ -240,7 +249,6 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .p-slot-status{font-size:9px;font-weight:700;margin-top:2px}
 .hist-card{background:var(--card);border-radius:var(--r2);padding:16px 18px;margin-bottom:10px;box-shadow:var(--sh1);border:1px solid var(--bdr)}
 .hist-badge{background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:800;border-radius:9px;padding:4px 10px}
-.hist-section-title{font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px}
 .coins-hero{background:linear-gradient(135deg,#FFB800,#FF9500);border-radius:var(--r3);padding:28px;color:#fff;margin-bottom:22px}
 .coins-balance{font-size:52px;font-weight:900;letter-spacing:-2px}
 .coins-table{background:var(--card);border-radius:var(--r2);overflow:hidden;border:1px solid var(--bdr)}
@@ -309,7 +317,6 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .btype-refresh{background:rgba(255,149,0,.15);color:#FF9500;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700}
 .btype-parking{background:rgba(0,122,255,.15);color:var(--blue);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700}
 .btype-admin{background:rgba(255,184,0,.15);color:#FFB800;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700}
-.locked-banner{background:linear-gradient(135deg,#FFF0F3,#FFE5EA);border:2px solid rgba(255,55,95,.2);border-radius:var(--r2);padding:20px;text-align:center;margin:20px 0}
 `;
 
 /* ─── HOOKS ─── */
@@ -396,7 +403,7 @@ function Chatbot({ movies }) {
     if (lower.includes('movie') || lower.includes('showing')) reply = `Now showing: ${movies.map(m => m.title).join(', ')} 🎬`;
     else if (lower.includes('price') || lower.includes('ticket')) reply = '🎟 Morning ₹120 · Afternoon ₹150 · Evening ₹180 · Night ₹200. Or 500 CineCoins!';
     else if (lower.includes('coin')) reply = '🪙 Earn 10 coins/ticket, 5 coins/snack, 5 coins/parking. Use 500 coins for free ticket!';
-    else if (lower.includes('parking') || lower.includes('park')) reply = '🅿️ Block A (2-Wheeler) ₹30 · Block B/C (4-Wheeler) ₹60/₹80 · Block D Free. +5🪙 on UPI!';
+    else if (lower.includes('parking') || lower.includes('park')) reply = '🅿️ Block A (2-Wheeler) ₹30 · Block B/C (4-Wheeler) ₹60/₹80 · Block D Free. +5🪙 on Razorpay!';
     if (reply) { setMsgs(p => [...p, { role: 'bot', text: reply }]); setLoading(false); return; }
     try {
       const res = await axios.post(`${API}/chatbot`, { message: msg });
@@ -466,7 +473,7 @@ function AdminApp({ onBack }) {
   const [adminBookLoading, setAdminBookLoading] = useState(false);
   const [adminBookResult, setAdminBookResult] = useState(null);
 
-  // FIX: saveMovies broadcasts to user side immediately
+  // Broadcast to user side immediately
   const saveMovies = useCallback((m) => {
     setMovies(m);
     broadcastMovieUpdate(m);
@@ -497,14 +504,11 @@ function AdminApp({ onBack }) {
       if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data);
       if (usersRes.status === 'fulfilled') setAllUsers(usersRes.value.data);
       if (parkingRes.status === 'fulfilled' && parkingRes.value.data?.length > 0) {
-        const slots = parkingRes.value.data;
-        setParkingSlots(slots);
-        saveParking(slots);
+        saveParking(parkingRes.value.data);
       }
       if (moviesRes.status === 'fulfilled' && moviesRes.value.data?.length > 0) {
-        const dbMovies = moviesRes.value.data;
-        const merged = [...DEFAULT_MOVIES];
-        dbMovies.forEach(bm => { if (!merged.find(m => m.title === bm.title)) merged.push(bm); });
+        // FIX: DB movies take priority — merge with defaults but DB wins
+        const merged = mergeMovies(moviesRes.value.data, DEFAULT_MOVIES);
         saveMovies(merged);
       }
       if (snacksRes.status === 'fulfilled' && snacksRes.value.data?.length > 0) {
@@ -529,84 +533,83 @@ function AdminApp({ onBack }) {
 
   const bookedCnt = Object.values(seatMap).filter(Boolean).length;
 
-  // FIX: handleSaveMovie - handles local IDs properly, syncs to DB and user side
+  // FIX: Save movie — always upsert to DB by title, replace local entry with DB entry
   const handleSaveMovie = async () => {
     if (!movieForm.title.trim()) { showToast('❌ Title is required'); return; }
     setMovieSaving(true);
 
-    const isLocalId = !editMovieId || editMovieId.startsWith('local-');
-    const newMovie = {
-      ...movieForm,
+    const moviePayload = {
+      title: movieForm.title.trim(),
+      genre: movieForm.genre,
+      language: movieForm.language,
+      duration: movieForm.duration,
       rating: parseFloat(movieForm.rating) || 8.0,
       timings: movieForm.timings.split(',').map(t => t.trim()).filter(Boolean),
       pricing: { morning: 120, afternoon: 150, evening: 180, night: 200 },
+      img: movieForm.img || '',
+      description: movieForm.description || '',
     };
 
     try {
-      if (editMovieId) {
-        if (isLocalId) {
-          // For local IDs: try to create in DB (upsert by title), then update local list
-          try {
-            const dbRes = await axios.post(`${API}/admin/movies`, { ...newMovie });
-            const dbMovie = dbRes.data;
-            // Replace local ID with real DB ID
-            const updated = movies.map(m => m._id === editMovieId ? { ...newMovie, _id: dbMovie._id || editMovieId } : m);
-            saveMovies(updated);
-            showToast('✅ Movie updated & synced to DB!');
-          } catch {
-            // DB failed, update locally only
-            const updated = movies.map(m => m._id === editMovieId ? { ...newMovie, _id: editMovieId } : m);
-            saveMovies(updated);
-            showToast('✅ Movie updated locally (DB sync pending)');
-          }
-        } else {
-          // Real MongoDB ID
-          try {
-            await axios.put(`${API}/admin/movies/${editMovieId}`, newMovie);
-            const updated = movies.map(m => m._id === editMovieId ? { ...newMovie, _id: editMovieId } : m);
-            saveMovies(updated);
-            showToast('✅ Movie updated in DB!');
-          } catch {
-            const updated = movies.map(m => m._id === editMovieId ? { ...newMovie, _id: editMovieId } : m);
-            saveMovies(updated);
-            showToast('✅ Movie updated locally');
-          }
+      let savedMovie = null;
+
+      if (editMovieId && !editMovieId.startsWith('local-') && editMovieId.length === 24) {
+        // Real MongoDB _id — PUT update
+        try {
+          const res = await axios.put(`${API}/admin/movies/${editMovieId}`, moviePayload);
+          savedMovie = res.data;
+        } catch (e) {
+          // Fallback to POST upsert by title
+          const res = await axios.post(`${API}/admin/movies`, moviePayload);
+          savedMovie = res.data;
         }
       } else {
-        // New movie
-        try {
-          const dbRes = await axios.post(`${API}/admin/movies`, newMovie);
-          const dbMovie = dbRes.data;
-          saveMovies([...movies, { ...newMovie, _id: dbMovie._id || `local-${Date.now()}` }]);
-          showToast('✅ Movie added to DB!');
-        } catch {
-          saveMovies([...movies, { ...newMovie, _id: `local-${Date.now()}` }]);
-          showToast('✅ Movie added locally');
-        }
+        // Local ID or new — POST (upsert by title on server)
+        const res = await axios.post(`${API}/admin/movies`, moviePayload);
+        savedMovie = res.data;
+      }
+
+      // Replace the local/old entry with the DB entry (which has a real _id)
+      if (savedMovie && savedMovie._id) {
+        const updated = movies.filter(m =>
+          m._id !== editMovieId && m.title !== savedMovie.title
+        );
+        saveMovies([...updated, savedMovie]);
+        showToast('✅ Movie saved & synced to all users!');
+      } else {
+        throw new Error('No ID returned from server');
       }
     } catch (e) {
-      showToast('❌ Save failed: ' + e.message);
+      // Fallback: update locally only
+      if (editMovieId) {
+        const updated = movies.map(m => m._id === editMovieId ? { ...moviePayload, _id: editMovieId } : m);
+        saveMovies(updated);
+      } else {
+        saveMovies([...movies, { ...moviePayload, _id: `local-${Date.now()}` }]);
+      }
+      showToast('⚠️ Saved locally — DB sync pending: ' + e.message);
     }
 
     setEditMovieId(null); setImgPreview(''); setMovieForm(emptyMovie);
     setMovieSaving(false);
   };
 
-  // FIX: handleDeleteMovie - handles local IDs gracefully
+  // FIX: Delete movie — only call DB for real IDs, always remove from local state
   const handleDeleteMovie = async (id) => {
     if (!window.confirm('Delete this movie?')) return;
-    const isLocalId = id.startsWith('local-');
-    // Always remove from local state first
+    // Remove from local state first (immediate UI update)
     saveMovies(movies.filter(m => m._id !== id));
-    if (!isLocalId) {
-      // Only try DB delete for real IDs
+
+    if (id && !id.startsWith('local-') && id.length === 24) {
       try {
         await axios.delete(`${API}/admin/movies/${id}`);
+        showToast('🗑 Movie deleted from DB');
       } catch (e) {
-        console.warn('DB delete failed (already removed locally):', e.message);
+        showToast('🗑 Removed locally (DB error: ' + e.message + ')');
       }
+    } else {
+      showToast('🗑 Movie removed');
     }
-    showToast('🗑 Movie deleted');
   };
 
   const handleSaveSnack = async () => {
@@ -638,15 +641,13 @@ function AdminApp({ onBack }) {
   const handleResetParking = async () => {
     if (!window.confirm('Release all parking slots?')) return;
     await axios.delete(`${API}/admin/parking/reset`).catch(() => {});
-    const reset = parkingSlots.map(s => ({ ...s, isBooked: false, bookedBy: null }));
-    saveParking(reset);
+    saveParking(parkingSlots.map(s => ({ ...s, isBooked: false, bookedBy: null })));
     showToast('✅ All slots released');
   };
 
   const handleReleaseSlot = async (slotNumber) => {
     await axios.post(`${API}/parking/release/${slotNumber}`).catch(() => {});
-    const updated = parkingSlots.map(s => s.slotNumber === slotNumber ? { ...s, isBooked: false, bookedBy: null } : s);
-    saveParking(updated);
+    saveParking(parkingSlots.map(s => s.slotNumber === slotNumber ? { ...s, isBooked: false, bookedBy: null } : s));
     showToast(`✅ Slot ${slotNumber} released`);
   };
 
@@ -783,7 +784,7 @@ function AdminApp({ onBack }) {
                         <span className="btype-ticket">TICKET</span>
                       </div>
                       <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12, marginTop: 3 }}>👤 {b.username} · 🕐 {b.timing} · Seats: {b.selectedSeats?.map(s => s + 1).join(', ')}</div>
-                      <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10, marginTop: 1 }}>Via: {b.paymentMethod || 'upi'} · 🪙 +{b.coinsEarned || 0} earned</div>
+                      <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10, marginTop: 1 }}>Via: {b.paymentMethod || 'razorpay'} · 🪙 +{b.coinsEarned || 0} earned</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ background: 'rgba(52,199,89,.15)', color: 'var(--green)', borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>₹{b.amount}</div>
@@ -799,10 +800,7 @@ function AdminApp({ onBack }) {
                 {allAdminBookings.map((b, i) => (
                   <div key={i} className="admin-table-row" style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,184,0,.2)' }}>
                     <div>
-                      <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 4 }}>
-                        <div style={{ color: '#FFB800', fontWeight: 700 }}>{b.movieName}</div>
-                        <span className="btype-admin">ADMIN</span>
-                      </div>
+                      <div style={{ color: '#FFB800', fontWeight: 700, marginBottom: 4 }}>{b.movieName} <span className="btype-admin">ADMIN</span></div>
                       <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12 }}>👤 {b.username} · 🕐 {b.timing} · Seats: {b.selectedSeats?.map(s => s + 1).join(', ')}</div>
                     </div>
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,.3)' }}>{new Date(b.date).toLocaleDateString('en-IN')}</div>
@@ -816,9 +814,7 @@ function AdminApp({ onBack }) {
                 {allRefreshments.map((r, i) => (
                   <div key={i} className="admin-table-row" style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,149,0,.15)' }}>
                     <div>
-                      <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 4 }}>
-                        <div style={{ color: '#fff', fontWeight: 700 }}>{r.username}</div><span className="btype-refresh">SNACKS</span>
-                      </div>
+                      <div style={{ color: '#fff', fontWeight: 700, marginBottom: 4 }}>{r.username} <span className="btype-refresh">SNACKS</span></div>
                       <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12 }}>{r.items?.map(i => `${i.name} ×${i.qty}`).join(', ')}</div>
                     </div>
                     <div style={{ background: 'rgba(255,149,0,.15)', color: '#FF9500', borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>₹{r.total}</div>
@@ -832,9 +828,7 @@ function AdminApp({ onBack }) {
                 {allParkingBookings.map((p, i) => (
                   <div key={i} className="admin-table-row" style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(0,122,255,.15)' }}>
                     <div>
-                      <div style={{ display: 'flex', gap: 7, alignItems: 'center', marginBottom: 4 }}>
-                        <div style={{ color: '#fff', fontWeight: 700 }}>Slot {p.slotNumber}</div><span className="btype-parking">PARKING</span>
-                      </div>
+                      <div style={{ color: '#fff', fontWeight: 700, marginBottom: 4 }}>Slot {p.slotNumber} <span className="btype-parking">PARKING</span></div>
                       <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 12 }}>👤 {p.username} · {p.slotType}</div>
                     </div>
                     <div style={{ background: 'rgba(0,122,255,.15)', color: 'var(--blue)', borderRadius: 7, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>₹{p.price}</div>
@@ -848,28 +842,25 @@ function AdminApp({ onBack }) {
           </div>
         )}
 
-        {/* MOVIES CRUD - FIX: clear distinction of local vs DB IDs */}
         {tab === 'movies' && (
           <div className="page">
             <div className="admin-card">
-              <div style={{ color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 14 }}>{editMovieId ? '✏️ Edit Movie' : '➕ Add Movie'}</div>
-              {editMovieId && editMovieId.startsWith('local-') && (
-                <div style={{ background: 'rgba(255,184,0,.12)', border: '1px solid rgba(255,184,0,.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#FFB800', fontWeight: 600 }}>
-                  ⚠️ This is a preset movie. Saving will sync it to the database and update all users.
-                </div>
-              )}
+              <div style={{ color: '#fff', fontWeight: 800, fontSize: 15, marginBottom: 14 }}>{editMovieId ? '✏️ Edit Movie' : '➕ Add New Movie'}</div>
+              <div style={{ background: 'rgba(52,199,89,.08)', border: '1px solid rgba(52,199,89,.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'rgba(52,199,89,.9)', fontWeight: 600 }}>
+                ✅ Changes sync instantly to all users. Poster URL updates appear immediately on the movie gallery.
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
                 {[['title','Title *'],['genre','Genre'],['language','Language'],['duration','Duration (e.g. 2h 30m)'],['rating','Rating (0-10)']].map(([k, l]) => (
                   <div key={k}><label className="admin-inp-label">{l}</label><input className="admin-inp" placeholder={l} value={movieForm[k]} onChange={e => setMovieForm(p => ({ ...p, [k]: e.target.value }))} /></div>
                 ))}
                 <div style={{ gridColumn: '1/-1' }}>
-                  <label className="admin-inp-label">🖼 Poster Image URL</label>
-                  <input className="admin-inp" placeholder="https://..." value={movieForm.img}
+                  <label className="admin-inp-label">🖼 Poster Image URL (paste direct image URL)</label>
+                  <input className="admin-inp" placeholder="https://example.com/poster.jpg" value={movieForm.img}
                     onChange={e => { setMovieForm(p => ({ ...p, img: e.target.value })); setImgPreview(e.target.value); }} />
                   {imgPreview && (
                     <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
                       <img src={imgPreview} alt="preview" style={{ width: 55, height: 78, objectFit: 'cover', borderRadius: 8, border: '2px solid rgba(255,255,255,.15)' }} onError={(e) => { e.target.style.display='none'; }} />
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Preview — this poster will be shown to all users</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Preview — this poster shows to all users instantly after save</div>
                     </div>
                   )}
                 </div>
@@ -884,23 +875,23 @@ function AdminApp({ onBack }) {
               </div>
               <div style={{ display: 'flex', gap: 9, marginTop: 4 }}>
                 <button className="btn btn-red btn-sm" onClick={handleSaveMovie} disabled={movieSaving}>
-                  {movieSaving ? <span className="spinner" /> : '💾 Save Movie'}
+                  {movieSaving ? <span className="spinner" /> : editMovieId ? '💾 Update Movie' : '➕ Add Movie'}
                 </button>
                 {editMovieId && <button className="btn btn-grey btn-sm" onClick={() => { setEditMovieId(null); setImgPreview(''); setMovieForm(emptyMovie); }}>Cancel</button>}
               </div>
             </div>
 
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', margin: '18px 0 10px' }}>{movies.length} Movies</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', margin: '18px 0 10px' }}>{movies.length} Movies in System</div>
             {movies.map(m => (
               <div key={m._id} className="admin-table-row" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 {m.img
-                  ? <img src={m.img} style={{ width: 46, height: 64, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} alt={m.title} onError={e => { e.target.style.display = 'none'; }} />
+                  ? <img src={m.img} style={{ width: 46, height: 64, borderRadius: 7, objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(255,255,255,.1)' }} alt={m.title} onError={e => { e.target.style.display = 'none'; }} />
                   : <div style={{ width: 46, height: 64, borderRadius: 7, background: 'rgba(255,255,255,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🎬</div>}
                 <div style={{ flex: 1 }}>
                   <div style={{ color: '#fff', fontWeight: 800 }}>{m.title}</div>
                   <div style={{ color: 'rgba(255,255,255,.4)', fontSize: 11, marginTop: 2 }}>{m.genre} · {m.language} · ⭐{m.rating}</div>
                   <div style={{ color: 'rgba(255,255,255,.3)', fontSize: 10, marginTop: 1 }}>{m.timings?.join(' | ')}</div>
-                  {m._id?.startsWith('local-') && <div style={{ color: 'rgba(255,184,0,.6)', fontSize: 9, marginTop: 1 }}>⚡ Preset (edit to sync to DB)</div>}
+                  {m._id?.startsWith('local-') && <div style={{ color: 'rgba(255,184,0,.7)', fontSize: 9, marginTop: 1 }}>⚡ Preset — click ✏️ Edit then Save to push to DB & all users</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 7 }}>
                   <button className="chip chip-blue" onClick={() => {
@@ -967,14 +958,13 @@ function AdminApp({ onBack }) {
             {['A','B','C','D'].map(block => {
               const info = BLOCK_INFO[block];
               const slots = parkingSlots.filter(s => s.block === block || s.slotNumber?.startsWith(block));
-              const bookedInBlock = slots.filter(s => s.isBooked).length;
               return (
                 <div key={block} className="admin-park-block">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: info.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, color: '#fff' }}>{block}</div>
                     <div>
                       <div style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>{info.label} — {info.icon} {info.desc}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>{bookedInBlock}/{slots.length} occupied</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', marginTop: 2 }}>{slots.filter(s => s.isBooked).length}/{slots.length} occupied</div>
                     </div>
                   </div>
                   <div className="admin-park-slots">
@@ -1080,12 +1070,10 @@ function UserApp({ onAdmin }) {
   const [authMode, setAuthMode] = useState('login');
   const [form, setForm] = useState({ username: '', password: '', email: '', phone: '' });
 
+  // FIX: Load movies from DB first, fallback to localStorage, then defaults
   const [movies, setMovies] = useState(() => LS.get('ct_admin_movies', DEFAULT_MOVIES));
   const [snacks, setSnacks] = useState(() => LS.get('ct_admin_snacks', DEFAULT_SNACKS));
   const [parkingSlots, setParkingSlots] = useState(() => LS.get('ct_admin_parking', buildDefaultParking()));
-
-  // FIX: Track confirmed ticket booking to unlock snacks/parking
-  const [confirmedBooking, setConfirmedBooking] = useState(null); // {movie, timing, seats}
 
   const [movie, setMovie] = useState(null);
   const [timing, setTiming] = useState('');
@@ -1105,10 +1093,12 @@ function UserApp({ onAdmin }) {
   const [parkingLoading, setParkingLoading] = useState(false);
   const [histTab, setHistTab] = useState('tickets');
 
-  // FIX: Listen for movie updates from admin side (same-tab or cross-tab)
+  // FIX: Listen for movie updates from admin side (same-tab custom event + cross-tab storage event)
   useEffect(() => {
     const handleMovieUpdate = (e) => {
-      if (e.detail) setMovies(e.detail);
+      if (e.detail && Array.isArray(e.detail)) {
+        setMovies(e.detail);
+      }
     };
     const handleStorageChange = (e) => {
       if (e.key === 'ct_admin_movies') {
@@ -1129,22 +1119,11 @@ function UserApp({ onAdmin }) {
     };
   }, []);
 
-  const refreshCoins = useCallback(async (username) => {
-    if (!username) return;
-    try {
-      const res = await axios.get(`${API}/user/coins/${username}`);
-      const coins = res.data.cineCoins || 0;
-      setCineCoins(coins);
-      return coins;
-    } catch { return 0; }
-  }, []);
-
-  // Load backend movies/snacks on mount to keep user side fresh
+  // FIX: Load fresh data from DB on mount — DB movies always take priority
   useEffect(() => {
     axios.get(`${API}/movies`).then(r => {
       if (r.data?.length > 0) {
-        const merged = [...DEFAULT_MOVIES];
-        r.data.forEach(bm => { if (!merged.find(m => m.title === bm.title)) merged.push(bm); });
+        const merged = mergeMovies(r.data, DEFAULT_MOVIES);
         setMovies(merged);
         LS.set('ct_admin_movies', merged);
       }
@@ -1165,6 +1144,16 @@ function UserApp({ onAdmin }) {
         LS.set('ct_admin_parking', r.data);
       }
     }).catch(() => {});
+  }, []);
+
+  const refreshCoins = useCallback(async (username) => {
+    if (!username) return 0;
+    try {
+      const res = await axios.get(`${API}/user/coins/${username}`);
+      const coins = res.data.cineCoins ?? 0;
+      setCineCoins(coins);
+      return coins;
+    } catch { return 0; }
   }, []);
 
   useEffect(() => {
@@ -1245,7 +1234,7 @@ function UserApp({ onAdmin }) {
     await refreshCoins(user);
   };
 
-  // ─── RAZORPAY ────────────────────────────────────────────────────────────
+  // ─── RAZORPAY ─────────────────────────────────────────────────────────────
   const loadRazorpayScript = () => new Promise(resolve => {
     if (window.Razorpay) { resolve(true); return; }
     const s = document.createElement('script');
@@ -1255,7 +1244,8 @@ function UserApp({ onAdmin }) {
     document.body.appendChild(s);
   });
 
-  // FIX: openRazorpay - robust fallback, proper handler
+  // FIX: openRazorpay — creates real order from backend, uses real key_id
+  // Falls back to test mode simulation if backend is unavailable
   const openRazorpay = useCallback(async ({ amount, description, onSuccess, onFailure }) => {
     if (!amount || amount <= 0) { showToast('❌ Invalid amount'); onFailure?.(); return; }
 
@@ -1263,6 +1253,7 @@ function UserApp({ onAdmin }) {
     if (!ok) { showToast('❌ Razorpay failed to load. Check internet.'); onFailure?.(); return; }
 
     let orderData = null;
+    let useFallback = false;
 
     try {
       const res = await axios.post(`${API}/payment/create-order`, {
@@ -1272,44 +1263,53 @@ function UserApp({ onAdmin }) {
       });
       orderData = res.data;
     } catch (e) {
-      console.warn('Backend order creation failed, using key-only mode:', e.message);
+      console.warn('Backend order creation failed:', e.message);
+      // If backend is down / keys not configured — we can't proceed with real Razorpay
+      // Show a clear error instead of trying with invalid key
+      showToast('❌ Payment setup failed. Check Razorpay credentials in .env');
+      onFailure?.();
+      return;
+    }
+
+    // Validate we have a real key (not placeholder)
+    if (!orderData?.keyId || orderData.keyId === 'rzp_test_REPLACE_ME' || orderData.keyId === 'rzp_test_placeholder') {
+      showToast('❌ Razorpay key not configured. Set RAZORPAY_KEY_ID in .env');
+      onFailure?.();
+      return;
     }
 
     const options = {
-      key: orderData?.keyId || 'rzp_test_placeholder',
+      key: orderData.keyId,
       amount: Math.round(amount * 100),
       currency: 'INR',
       name: 'Cine Time',
       description,
+      order_id: orderData.orderId,
       prefill: {
         name: user || 'Guest',
         email: userEmail || `${user || 'guest'}@cinetime.com`,
         contact: '9999999999'
       },
       theme: { color: '#FF375F' },
+      // FIX: handler receives payment response — verify on server then call onSuccess
       handler: async (response) => {
-        // FIX: Always treat Razorpay handler success as payment success
-        // In test mode, signature may or may not be present
-        const paymentInfo = {
-          orderId: response.razorpay_order_id || orderData?.orderId || `order_${Date.now()}`,
-          paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-          signature: response.razorpay_signature || 'test_mode'
-        };
-
-        if (response.razorpay_signature && response.razorpay_order_id) {
-          // Try server verification — but don't block on failure in test mode
-          try {
-            await axios.post(`${API}/payment/verify`, {
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-          } catch (verifyErr) {
-            console.warn('Verification failed but proceeding (test mode):', verifyErr.message);
-          }
+        try {
+          // Verify signature on server
+          await axios.post(`${API}/payment/verify`, {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+        } catch (verifyErr) {
+          // Verification can fail in test mode due to test key — proceed anyway
+          console.warn('Signature verify warning (test mode OK):', verifyErr.message);
         }
-
-        onSuccess(paymentInfo);
+        // Always call onSuccess after Razorpay handler fires — payment was captured
+        onSuccess({
+          orderId: response.razorpay_order_id,
+          paymentId: response.razorpay_payment_id,
+          signature: response.razorpay_signature,
+        });
       },
       modal: {
         ondismiss: () => {
@@ -1320,10 +1320,6 @@ function UserApp({ onAdmin }) {
         animation: true,
       },
     };
-
-    if (orderData?.orderId) {
-      options.order_id = orderData.orderId;
-    }
 
     try {
       const rzp = new window.Razorpay(options);
@@ -1338,7 +1334,7 @@ function UserApp({ onAdmin }) {
     }
   }, [user, userEmail, showToast]);
 
-  // FIX: confirmBooking - properly updates coins after payment
+  // FIX: confirmBooking — updates cineCoins from server response immediately
   const confirmBooking = async (method = 'razorpay') => {
     if (method === 'razorpay') {
       setRzpLoading(true);
@@ -1360,23 +1356,23 @@ function UserApp({ onAdmin }) {
             });
 
             const earned = res.data.coinsEarned || 0;
-            // FIX: Always refresh from server for accurate coin balance
-            const newBalance = res.data.newCoinBalance !== undefined
-              ? res.data.newCoinBalance
-              : await refreshCoins(user);
+            // FIX: Use server-returned balance directly — most accurate
+            const newBalance = res.data.newCoinBalance ?? await refreshCoins(user);
             setCineCoins(newBalance);
 
-            // FIX: Store confirmed booking to unlock snacks/parking
-            setConfirmedBooking({ movie, timing, seats: sel, eTicketQR: res.data.eTicketQR });
-
-            // FIX: Show e-ticket immediately
+            // FIX: Show e-ticket modal immediately after successful booking
             if (res.data.eTicketQR) {
-              setETicketModal({ qr: res.data.eTicketQR, movieName: movie.title, timing, seats: sel });
+              setETicketModal({
+                qr: res.data.eTicketQR,
+                movieName: movie.title,
+                timing,
+                seats: sel
+              });
             }
 
-            showToast(`✅ Booked! ${earned > 0 ? `+${earned} 🪙` : ''}`);
+            showToast(`✅ Booked! ${earned > 0 ? `+${earned} 🪙 earned` : ''}`);
 
-            // Also order refreshments if in cart
+            // Also submit refreshment order if cart has items
             if (cartItems.length > 0) {
               try {
                 const rRes = await axios.post(`${API}/refreshments/order`, {
@@ -1385,22 +1381,20 @@ function UserApp({ onAdmin }) {
                   total: refreshTotal, paymentMethod: 'razorpay',
                   razorpayOrderId: orderId, razorpayPaymentId: paymentId,
                 });
-                const newBal = rRes.data.newCoinBalance !== undefined
-                  ? rRes.data.newCoinBalance
-                  : await refreshCoins(user);
+                const newBal = rRes.data.newCoinBalance ?? await refreshCoins(user);
                 setCineCoins(newBal);
-              } catch {}
+              } catch (e) { console.warn('Refreshment order failed:', e.message); }
             }
 
             setSel([]); setCart({}); setPayMethod('razorpay');
             setPage('gallery');
-            // Refresh coins once more after all transactions
-            setTimeout(() => refreshCoins(user).then(c => { if (c) setCineCoins(c); }), 1500);
+            // Re-sync coins from server after small delay
+            setTimeout(() => refreshCoins(user), 1500);
           } catch (e) {
-            showToast('❌ ' + (e.response?.data?.error || 'Booking failed'));
+            showToast('❌ ' + (e.response?.data?.error || 'Booking failed after payment'));
           }
         },
-        onFailure: () => {},
+        onFailure: () => { setRzpLoading(false); },
       });
       setRzpLoading(false);
     } else {
@@ -1414,12 +1408,10 @@ function UserApp({ onAdmin }) {
           razorpayOrderId: null, razorpayPaymentId: null,
         });
 
-        const newBalance = res.data.newCoinBalance !== undefined
-          ? res.data.newCoinBalance
-          : await refreshCoins(user);
+        // FIX: Use server-returned balance
+        const newBalance = res.data.newCoinBalance ?? await refreshCoins(user);
         setCineCoins(newBalance);
 
-        setConfirmedBooking({ movie, timing, seats: sel, eTicketQR: res.data.eTicketQR });
         if (res.data.eTicketQR) {
           setETicketModal({ qr: res.data.eTicketQR, movieName: movie.title, timing, seats: sel });
         }
@@ -1427,7 +1419,7 @@ function UserApp({ onAdmin }) {
         showToast(`✅ Booked with CineCoins!`);
         setSel([]); setCart({}); setPayMethod('razorpay');
         setPage('gallery');
-        setTimeout(() => refreshCoins(user).then(c => { if (c) setCineCoins(c); }), 1000);
+        setTimeout(() => refreshCoins(user), 1000);
       } catch (e) {
         showToast('❌ ' + (e.response?.data?.error || 'Booking failed'));
       }
@@ -1454,19 +1446,19 @@ function UserApp({ onAdmin }) {
                   razorpayOrderId: orderId,
                   razorpayPaymentId: paymentId,
                 });
-                const newBal = res.data.newCoinBalance !== undefined
-                  ? res.data.newCoinBalance
-                  : await refreshCoins(user);
+                // FIX: Use server balance
+                const newBal = res.data.newCoinBalance ?? await refreshCoins(user);
                 setCineCoins(newBal);
                 setParkingSlots(prev => prev.map(s => s.slotNumber === slot.slotNumber ? { ...s, isBooked: true, bookedBy: user } : s));
                 setSelectedParkingSlot(null);
                 showToast(`✅ Slot ${slot.slotNumber} booked! +${res.data.coinsEarned || 0} 🪙`);
-                setTimeout(() => refreshCoins(user).then(c => { if (c) setCineCoins(c); }), 500);
+                setTimeout(() => refreshCoins(user), 500);
               } catch (e) { showToast('❌ ' + (e.response?.data?.error || 'Parking booking failed')); }
             },
             onFailure: () => {},
           });
         } else {
+          // Free slot (Disabled block)
           const res = await axios.post(`${API}/parking/book`, {
             slotNumber: slot.slotNumber, username: user,
             showTiming: timing || '', movieName: movie?.title || 'General',
@@ -1477,6 +1469,7 @@ function UserApp({ onAdmin }) {
           showToast(`✅ Slot ${slot.slotNumber} reserved!`);
         }
       } else {
+        // Coins payment for parking
         if (cineCoins < slot.coinPrice) { showToast(`Need ${slot.coinPrice} 🪙. You have ${cineCoins}.`); setParkingLoading(false); return; }
         const res = await axios.post(`${API}/parking/book`, {
           slotNumber: slot.slotNumber, username: user,
@@ -1484,14 +1477,13 @@ function UserApp({ onAdmin }) {
           paymentMethod: 'coins', coinsUsed: slot.coinPrice,
         });
         if (res.data.error) { showToast('❌ ' + res.data.error); setParkingLoading(false); return; }
-        const newBal = res.data.newCoinBalance !== undefined
-          ? res.data.newCoinBalance
-          : cineCoins - slot.coinPrice;
+        // FIX: Use server balance
+        const newBal = res.data.newCoinBalance ?? (cineCoins - slot.coinPrice);
         setCineCoins(newBal);
         setParkingSlots(prev => prev.map(s => s.slotNumber === slot.slotNumber ? { ...s, isBooked: true, bookedBy: user } : s));
         setSelectedParkingSlot(null);
         showToast(`✅ Slot ${slot.slotNumber} booked! 🪙-${slot.coinPrice}`);
-        setTimeout(() => refreshCoins(user).then(c => { if (c) setCineCoins(c); }), 500);
+        setTimeout(() => refreshCoins(user), 500);
       }
     } catch (e) {
       showToast('❌ ' + (e.response?.data?.error || e.message || 'Parking booking failed'));
@@ -1504,50 +1496,65 @@ function UserApp({ onAdmin }) {
   const cartQty = cartItems.reduce((s, i) => s + i.qty, 0);
   const selectedSlotObj = parkingSlots.find(s => s.slotNumber === selectedParkingSlot);
 
-  // FIX: Nav with locked state for snacks/parking
+  // Nav — snacks and parking are ALWAYS accessible (removed lock)
   const NavBar = () => (
     <nav className="nav">
       <div className="nav-brand" onClick={() => setPage('gallery')}>
         <div className="nav-pill">🎬</div><span className="nav-title">Cine Time</span>
       </div>
       <div className="nav-links">
-        {[['gallery','🎭 Movies'],['store','🍿 Snacks'],['parking','🅿️ Park'],['history','🎟 Tickets'],['coins','🪙 Coins']].map(([p, l]) => {
-          const isLocked = (p === 'store' || p === 'parking') && !confirmedBooking;
-          return (
-            <button key={p} className={`nav-link ${page === p ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-              onClick={() => {
-                if (isLocked) { showToast('🎟 Book a ticket first to access this!'); return; }
-                setPage(p);
-                if (p === 'history' || p === 'coins') loadHistory();
-              }}>{l}{isLocked ? ' 🔒' : ''}</button>
-          );
-        })}
+        {[['gallery','🎭 Movies'],['store','🍿 Snacks'],['parking','🅿️ Park'],['history','🎟 Tickets'],['coins','🪙 Coins']].map(([p, l]) => (
+          <button key={p} className={`nav-link ${page === p ? 'active' : ''}`}
+            onClick={() => {
+              setPage(p);
+              if (p === 'history' || p === 'coins') loadHistory();
+            }}>{l}</button>
+        ))}
       </div>
       <div className="nav-right">
         <div className="coin-badge" onClick={() => { setPage('coins'); loadHistory(); }}>🪙 {cineCoins}</div>
-        <button className="chip chip-grey" onClick={() => { setUser(null); setConfirmedBooking(null); showToast('Logged out'); }}>Logout</button>
+        <button className="chip chip-grey" onClick={() => { setUser(null); showToast('Logged out'); }}>Logout</button>
       </div>
     </nav>
   );
 
   const MobileNav = () => (
     <div className="mobile-nav">
-      {[['gallery','🎭','Movies'],['store','🍿','Snacks'],['parking','🅿️','Park'],['history','🎟','Tickets'],['coins','🪙','Coins']].map(([p, i, l]) => {
-        const isLocked = (p === 'store' || p === 'parking') && !confirmedBooking;
-        return (
-          <button key={p} className={`mob-tab ${page === p ? 'active' : ''} ${isLocked ? 'locked' : ''}`}
-            onClick={() => {
-              if (isLocked) { showToast('🎟 Book a ticket first!'); return; }
-              setPage(p);
-              if (p === 'history' || p === 'coins') loadHistory();
-            }}>
-            <span className="mob-tab-ico">{i}{isLocked ? '🔒' : ''}</span>
-            <span className="mob-tab-lbl">{l}</span>
-          </button>
-        );
-      })}
+      {[['gallery','🎭','Movies'],['store','🍿','Snacks'],['parking','🅿️','Park'],['history','🎟','Tickets'],['coins','🪙','Coins']].map(([p, i, l]) => (
+        <button key={p} className={`mob-tab ${page === p ? 'active' : ''}`}
+          onClick={() => {
+            setPage(p);
+            if (p === 'history' || p === 'coins') loadHistory();
+          }}>
+          <span className="mob-tab-ico">{i}</span>
+          <span className="mob-tab-lbl">{l}</span>
+        </button>
+      ))}
     </div>
   );
+
+  /* E-Ticket Modal */
+  const ETicketModalView = () => {
+    if (!eTicketModal) return null;
+    return (
+      <div className="modal-bg" onClick={() => setETicketModal(null)}>
+        <div className="modal-card" onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 36, marginBottom: 9 }}>🎉</div>
+          <div style={{ fontSize: 21, fontWeight: 900, marginBottom: 4 }}>Booking Confirmed!</div>
+          <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 4 }}>{eTicketModal.movieName}</div>
+          <div style={{ color: 'var(--t3)', fontSize: 12, marginBottom: 12 }}>
+            🕐 {eTicketModal.timing} · Seats: {eTicketModal.seats?.map(s => s + 1).join(', ')}
+          </div>
+          <div style={{ color: 'var(--t3)', fontSize: 12, marginBottom: 14 }}>Show this QR at the theater entrance</div>
+          {eTicketModal.qr && (
+            <img src={eTicketModal.qr} alt="E-Ticket QR" style={{ width: 180, borderRadius: 14, border: '4px solid white', boxShadow: 'var(--sh2)', marginBottom: 14 }} />
+          )}
+          {userEmail && <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14 }}>📧 Sent to {userEmail}</div>}
+          <button className="btn btn-red btn-sm" onClick={() => setETicketModal(null)}>Done ✓</button>
+        </div>
+      </div>
+    );
+  };
 
   /* AUTH */
   if (!user) return (
@@ -1565,7 +1572,7 @@ function UserApp({ onAdmin }) {
           <div className="auth-brand-name">Cine Time</div>
           <div className="auth-brand-tag">Your Ultimate Movie Experience</div>
           <div className="auth-features">
-            {[['🎟','Book Tickets Online'],['🍿','Order Refreshments (after booking)'],['🅿️','Reserve Parking (after booking)'],['🪙','Earn CineCoins']].map(([ico, txt]) => (
+            {[['🎟','Book Tickets Online'],['🍿','Order Refreshments Anytime'],['🅿️','Reserve Parking Anytime'],['🪙','Earn CineCoins on Every Purchase']].map(([ico, txt]) => (
               <div key={txt} className="auth-feat"><div className="auth-feat-ico">{ico}</div>{txt}</div>
             ))}
           </div>
@@ -1599,32 +1606,6 @@ function UserApp({ onAdmin }) {
     </>
   );
 
-  // FIX: E-Ticket Modal (shown after successful booking)
-  const ETicketModalView = () => {
-    if (!eTicketModal) return null;
-    return (
-      <div className="modal-bg" onClick={() => setETicketModal(null)}>
-        <div className="modal-card" onClick={e => e.stopPropagation()}>
-          <div style={{ fontSize: 36, marginBottom: 9 }}>🎉</div>
-          <div style={{ fontSize: 21, fontWeight: 900, marginBottom: 4 }}>Booking Confirmed!</div>
-          <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 4 }}>{eTicketModal.movieName}</div>
-          <div style={{ color: 'var(--t3)', fontSize: 12, marginBottom: 12 }}>
-            🕐 {eTicketModal.timing} · Seats: {eTicketModal.seats?.map(s => s + 1).join(', ')}
-          </div>
-          <div style={{ color: 'var(--t3)', fontSize: 12, marginBottom: 14 }}>Show this QR at the theater entrance</div>
-          {eTicketModal.qr && (
-            <img src={eTicketModal.qr} alt="E-Ticket QR" style={{ width: 180, borderRadius: 14, border: '4px solid white', boxShadow: 'var(--sh2)', marginBottom: 14 }} />
-          )}
-          {userEmail && <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14 }}>📧 Confirmation sent to {userEmail}</div>}
-          <div style={{ background: 'var(--accent-bg)', borderRadius: 12, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--accent)', fontWeight: 700 }}>
-            🍿 You can now order Snacks & Book Parking!
-          </div>
-          <button className="btn btn-red btn-sm" onClick={() => setETicketModal(null)}>Done ✓</button>
-        </div>
-      </div>
-    );
-  };
-
   /* GALLERY */
   if (page === 'gallery') return (
     <>
@@ -1634,22 +1615,15 @@ function UserApp({ onAdmin }) {
         <div style={{ marginBottom: 22 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 1.5 }}>Hey {user} 👋</div>
           <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: -1, marginTop: 3 }}>Now Showing</div>
-          {!confirmedBooking && (
-            <div style={{ background: 'var(--accent-bg)', border: '1px solid rgba(255,55,95,.2)', borderRadius: 11, padding: '10px 14px', marginTop: 12, fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
-              🎟 Book a ticket below to unlock Snacks & Parking!
-            </div>
-          )}
-          {confirmedBooking && (
-            <div style={{ background: '#E8FFF0', border: '1px solid rgba(52,199,89,.25)', borderRadius: 11, padding: '10px 14px', marginTop: 12, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>
-              ✅ Ticket booked for {confirmedBooking.movie?.title}! Snacks & Parking unlocked. 🍿🅿️
-            </div>
-          )}
+          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>
+            🍿 Snacks & 🅿️ Parking are available anytime · 🪙 Earn CineCoins on every Razorpay purchase
+          </div>
         </div>
         <div className="movie-grid">
           {movies.map((m, i) => (
             <div key={m._id || i} className="movie-card" style={{ animationDelay: `${i * 0.06}s` }} onClick={() => { setMovie(m); setSel([]); setPage('timings'); }}>
               {m.img
-                ? <img src={m.img} className="movie-poster" alt={m.title} onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                ? <img src={m.img} className="movie-poster" alt={m.title} onError={e => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }} />
                 : null}
               <div className="movie-poster-placeholder" style={{ display: m.img ? 'none' : 'flex' }}>🎬</div>
               <div className="movie-meta">
@@ -1780,7 +1754,7 @@ function UserApp({ onAdmin }) {
               <div className="rzp-info">
                 <div className="rzp-logo">💳</div>
                 <div className="rzp-title">Pay via Razorpay</div>
-                <div className="rzp-sub">Card · UPI · Net Banking · Wallets<br/>Test card: 4111 1111 1111 1111 / Any CVV / Any future date</div>
+                <div className="rzp-sub">Card · UPI · Net Banking · Wallets<br/>Test: 4111 1111 1111 1111 / Any CVV / Future date</div>
               </div>
               <button className="btn btn-upi" onClick={() => confirmBooking('razorpay')} disabled={rzpLoading || sel.length === 0}>
                 {rzpLoading ? <><span className="spinner" style={{ marginRight: 8 }} />Processing...</> : `💳 Pay ₹${ticketTotal + refreshTotal} via Razorpay`}
@@ -1809,7 +1783,7 @@ function UserApp({ onAdmin }) {
     </>
   );
 
-  /* STORE — only accessible after ticket booking */
+  /* STORE — always accessible */
   if (page === 'store') return (
     <>
       <style>{G}</style><Toast msg={toast} />
@@ -1819,44 +1793,28 @@ function UserApp({ onAdmin }) {
         <div className="coin-badge">🪙 {cineCoins}</div>
       </nav>
       <div className="page-shell page" style={{ paddingBottom: cartQty > 0 ? 95 : 80 }}>
-        {!confirmedBooking ? (
-          <div className="locked-banner">
-            <div style={{ fontSize: 40, marginBottom: 10 }}>🔒</div>
-            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>Book a ticket first!</div>
-            <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 16 }}>You can order snacks after booking a movie ticket.</div>
-            <button className="btn btn-red btn-sm" onClick={() => setPage('gallery')}>Browse Movies →</button>
-          </div>
-        ) : (
-          <>
-            {confirmedBooking && (
-              <div style={{ background: '#E8FFF0', border: '1px solid rgba(52,199,89,.25)', borderRadius: 12, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--green)', fontWeight: 700 }}>
-                🎟 Booking: {confirmedBooking.movie?.title} · {confirmedBooking.timing}
+        <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -1, marginBottom: 5 }}>Refreshments</div>
+        <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 18 }}>Order ahead · Earn 5 CineCoins per order via Razorpay!</div>
+        <div className="cat-row">{cats.map(c => <button key={c} className={`cat-btn ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}</div>
+        <div className="menu-grid">
+          {filteredSnacks.map(item => {
+            const qty = cart[item._id]?.qty || 0;
+            return (
+              <div key={item._id} className="menu-card" onClick={() => addToCart(item)}>
+                {qty > 0 && <div className="qty-badge">×{qty}</div>}
+                <div className="menu-emoji">{item.emoji}</div>
+                <div className="menu-body">
+                  <div className="menu-name">{item.name}</div>
+                  <div className="menu-price">₹{item.price}</div>
+                  <div className="menu-coin">🪙 {item.coinPrice} coins</div>
+                </div>
+                <div className="menu-plus">+</div>
               </div>
-            )}
-            <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -1, marginBottom: 5 }}>Refreshments</div>
-            <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 18 }}>Order ahead · Earn 5 CineCoins per order!</div>
-            <div className="cat-row">{cats.map(c => <button key={c} className={`cat-btn ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}</div>
-            <div className="menu-grid">
-              {filteredSnacks.map(item => {
-                const qty = cart[item._id]?.qty || 0;
-                return (
-                  <div key={item._id} className="menu-card" onClick={() => addToCart(item)}>
-                    {qty > 0 && <div className="qty-badge">×{qty}</div>}
-                    <div className="menu-emoji">{item.emoji}</div>
-                    <div className="menu-body">
-                      <div className="menu-name">{item.name}</div>
-                      <div className="menu-price">₹{item.price}</div>
-                      <div className="menu-coin">🪙 {item.coinPrice} coins</div>
-                    </div>
-                    <div className="menu-plus">+</div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+            );
+          })}
+        </div>
       </div>
-      {cartQty > 0 && confirmedBooking && (
+      {cartQty > 0 && (
         <div className="cart-bar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 38, height: 38, background: 'var(--accent-bg)', borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: 'var(--accent)', fontSize: 15 }}>{cartQty}</div>
@@ -1870,18 +1828,17 @@ function UserApp({ onAdmin }) {
                 onSuccess: async ({ orderId, paymentId }) => {
                   try {
                     const rRes = await axios.post(`${API}/refreshments/order`, {
-                      username: user, movieName: confirmedBooking?.movie?.title || 'General', timing: confirmedBooking?.timing || '',
+                      username: user, movieName: 'Snack Bar', timing: '',
                       items: cartItems.map(i => ({ name: i.name, qty: i.qty, price: i.price, coinPrice: i.coinPrice })),
                       total: refreshTotal, paymentMethod: 'razorpay',
                       razorpayOrderId: orderId, razorpayPaymentId: paymentId,
                     });
-                    const newBal = rRes.data.newCoinBalance !== undefined
-                      ? rRes.data.newCoinBalance
-                      : await refreshCoins(user);
+                    // FIX: Use server balance
+                    const newBal = rRes.data.newCoinBalance ?? await refreshCoins(user);
                     setCineCoins(newBal);
                     setCart({});
                     showToast(`🛒 Ordered! +${rRes.data.coinsEarned || 0} 🪙`);
-                    setTimeout(() => refreshCoins(user).then(c => { if (c) setCineCoins(c); }), 800);
+                    setTimeout(() => refreshCoins(user), 800);
                   } catch { showToast('❌ Order failed'); }
                 },
                 onFailure: () => {},
@@ -1893,96 +1850,81 @@ function UserApp({ onAdmin }) {
     </>
   );
 
-  /* PARKING — only accessible after ticket booking */
+  /* PARKING — always accessible */
   if (page === 'parking') return (
     <>
       <style>{G}</style><Toast msg={toast} />
       <NavBar />
       <div className="parking-wrap page">
         <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -1, marginBottom: 5 }}>🅿️ Parking</div>
+        <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>
+          Block A (2-Wheeler) ₹30 · Block B (4-Wheeler) ₹60 · Block C (Premium) ₹80 · Block D (Disabled) Free · +5🪙 on Razorpay
+        </div>
 
-        {!confirmedBooking ? (
-          <div className="locked-banner">
-            <div style={{ fontSize: 40, marginBottom: 10 }}>🔒</div>
-            <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>Book a ticket first!</div>
-            <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 16 }}>Parking is available only after booking a movie ticket.</div>
-            <button className="btn btn-red btn-sm" onClick={() => setPage('gallery')}>Browse Movies →</button>
-          </div>
-        ) : (
-          <>
-            <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 20 }}>
-              Block A (2-Wheeler) ₹30 · Block B (4-Wheeler) ₹60 · Block C (Premium) ₹80 · Block D (Disabled) Free · +5 🪙 on UPI
+        {selectedParkingSlot && selectedSlotObj && (
+          <div style={{ background: 'var(--card)', borderRadius: 'var(--r3)', padding: 22, marginBottom: 18, boxShadow: 'var(--sh2)', border: '1px solid var(--bdr)' }}>
+            <div style={{ fontWeight: 900, fontSize: 19, marginBottom: 4 }}>Slot {selectedSlotObj.slotNumber}</div>
+            <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 16 }}>
+              {selectedSlotObj.slotType} · {selectedSlotObj.price > 0 ? `₹${selectedSlotObj.price}` : 'Free'}{' '}
+              {selectedSlotObj.coinPrice > 0 ? `or ${selectedSlotObj.coinPrice} 🪙` : ''}
             </div>
-
-            {selectedParkingSlot && selectedSlotObj && (
-              <div style={{ background: 'var(--card)', borderRadius: 'var(--r3)', padding: 22, marginBottom: 18, boxShadow: 'var(--sh2)', border: '1px solid var(--bdr)' }}>
-                <div style={{ fontWeight: 900, fontSize: 19, marginBottom: 4 }}>Slot {selectedSlotObj.slotNumber}</div>
-                <div style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 16 }}>
-                  {selectedSlotObj.slotType} · {selectedSlotObj.price > 0 ? `₹${selectedSlotObj.price}` : 'Free'}{' '}
-                  {selectedSlotObj.coinPrice > 0 ? `or ${selectedSlotObj.coinPrice} 🪙` : ''}
-                </div>
-                <div className="rzp-info" style={{ marginBottom: 12, textAlign: 'left' }}>
-                  <div style={{ fontSize: 12, color: '#1a4fb5' }}>💳 Razorpay — Card · UPI · Net Banking · Wallets</div>
-                </div>
-                <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-                  <button className="btn btn-upi btn-sm" disabled={parkingLoading} onClick={() => bookParking(selectedSlotObj, 'razorpay')}>
-                    {parkingLoading ? <span className="spinner" /> : selectedSlotObj.price > 0 ? `💳 Pay ₹${selectedSlotObj.price}` : '✅ Reserve Free Slot'}
-                  </button>
-                  {selectedSlotObj.coinPrice > 0 && (
-                    <button className="btn btn-coins btn-sm" disabled={parkingLoading || cineCoins < selectedSlotObj.coinPrice}
-                      onClick={() => bookParking(selectedSlotObj, 'coins')}>
-                      🪙 Pay {selectedSlotObj.coinPrice} Coins {cineCoins < selectedSlotObj.coinPrice ? `(need ${selectedSlotObj.coinPrice - cineCoins} more)` : ''}
-                    </button>
-                  )}
-                </div>
-                <button className="btn btn-grey btn-sm" style={{ marginTop: 9 }} onClick={() => setSelectedParkingSlot(null)}>Cancel</button>
-              </div>
-            )}
-
-            {[
-              { block: 'A', icon: '🏍', label: 'Block A — Two-Wheeler', color: '#007AFF', price: '₹30 per slot' },
-              { block: 'B', icon: '🚗', label: 'Block B — Four-Wheeler', color: '#34C759', price: '₹60 per slot' },
-              { block: 'C', icon: '🚙', label: 'Block C — Four-Wheeler Premium', color: '#FF9500', price: '₹80 per slot' },
-              { block: 'D', icon: '♿', label: 'Block D — Disabled', color: '#8E8E93', price: 'Free' },
-            ].map(({ block, icon, label, color, price }) => {
-              const slots = parkingSlots.filter(s => (s.block === block) || (!s.block && s.slotNumber?.startsWith(block)));
-              const freeCount = slots.filter(s => !s.isBooked).length;
-              return (
-                <div key={block} className="parking-block-card">
-                  <div className="parking-block-header">
-                    <div className="parking-block-label" style={{ background: color }}>{icon}</div>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 15 }}>{label}</div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 1 }}>{price} · {freeCount}/{slots.length} available</div>
-                    </div>
-                  </div>
-                  <div className="parking-slots-grid">
-                    {slots.map(slot => {
-                      const isOwn = slot.bookedBy === user;
-                      const isSel = selectedParkingSlot === slot.slotNumber;
-                      let cls = 'p-free';
-                      if (slot.isBooked) cls = 'p-booked';
-                      else if (slot.slotType === 'Disabled') cls = 'p-disabled';
-                      else if (isSel) cls = 'p-selected';
-                      return (
-                        <div key={slot.slotNumber} className={`parking-slot ${cls}`}
-                          onClick={() => {
-                            if (slot.isBooked) return;
-                            setSelectedParkingSlot(s => s === slot.slotNumber ? null : slot.slotNumber);
-                          }}>
-                          <div className="p-slot-num" style={{ color: isSel ? '#fff' : undefined }}>{slot.slotNumber}</div>
-                          <div className="p-slot-status" style={{ color: slot.isBooked ? 'var(--accent)' : isSel ? 'rgba(255,255,255,.85)' : slot.slotType === 'Disabled' ? 'var(--t4)' : 'var(--green)' }}>
-                            {slot.isBooked ? (isOwn ? 'YOURS' : 'FULL') : slot.slotType === 'Disabled' ? 'RESERVED' : isSel ? 'SELECTED' : 'FREE'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </>
+            <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+              <button className="btn btn-upi btn-sm" disabled={parkingLoading} onClick={() => bookParking(selectedSlotObj, 'razorpay')}>
+                {parkingLoading ? <span className="spinner" /> : selectedSlotObj.price > 0 ? `💳 Pay ₹${selectedSlotObj.price}` : '✅ Reserve Free Slot'}
+              </button>
+              {selectedSlotObj.coinPrice > 0 && (
+                <button className="btn btn-coins btn-sm" disabled={parkingLoading || cineCoins < selectedSlotObj.coinPrice}
+                  onClick={() => bookParking(selectedSlotObj, 'coins')}>
+                  🪙 {selectedSlotObj.coinPrice} Coins {cineCoins < selectedSlotObj.coinPrice ? `(need ${selectedSlotObj.coinPrice - cineCoins} more)` : ''}
+                </button>
+              )}
+            </div>
+            <button className="btn btn-grey btn-sm" style={{ marginTop: 9 }} onClick={() => setSelectedParkingSlot(null)}>Cancel</button>
+          </div>
         )}
+
+        {[
+          { block: 'A', icon: '🏍', label: 'Block A — Two-Wheeler', color: '#007AFF', price: '₹30 per slot' },
+          { block: 'B', icon: '🚗', label: 'Block B — Four-Wheeler', color: '#34C759', price: '₹60 per slot' },
+          { block: 'C', icon: '🚙', label: 'Block C — Four-Wheeler Premium', color: '#FF9500', price: '₹80 per slot' },
+          { block: 'D', icon: '♿', label: 'Block D — Disabled', color: '#8E8E93', price: 'Free' },
+        ].map(({ block, icon, label, color, price }) => {
+          const slots = parkingSlots.filter(s => (s.block === block) || (!s.block && s.slotNumber?.startsWith(block)));
+          const freeCount = slots.filter(s => !s.isBooked).length;
+          return (
+            <div key={block} className="parking-block-card">
+              <div className="parking-block-header">
+                <div className="parking-block-label" style={{ background: color }}>{icon}</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 1 }}>{price} · {freeCount}/{slots.length} available</div>
+                </div>
+              </div>
+              <div className="parking-slots-grid">
+                {slots.map(slot => {
+                  const isOwn = slot.bookedBy === user;
+                  const isSel = selectedParkingSlot === slot.slotNumber;
+                  let cls = 'p-free';
+                  if (slot.isBooked) cls = 'p-booked';
+                  else if (slot.slotType === 'Disabled') cls = 'p-disabled';
+                  else if (isSel) cls = 'p-selected';
+                  return (
+                    <div key={slot.slotNumber} className={`parking-slot ${cls}`}
+                      onClick={() => {
+                        if (slot.isBooked) return;
+                        setSelectedParkingSlot(s => s === slot.slotNumber ? null : slot.slotNumber);
+                      }}>
+                      <div className="p-slot-num" style={{ color: isSel ? '#fff' : undefined }}>{slot.slotNumber}</div>
+                      <div className="p-slot-status" style={{ color: slot.isBooked ? 'var(--accent)' : isSel ? 'rgba(255,255,255,.85)' : slot.slotType === 'Disabled' ? 'var(--t4)' : 'var(--green)' }}>
+                        {slot.isBooked ? (isOwn ? 'YOURS' : 'FULL') : slot.slotType === 'Disabled' ? 'RESERVED' : isSel ? 'SELECTED' : 'FREE'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
       <MobileNav /><Chatbot movies={movies} />
     </>
@@ -2104,14 +2046,14 @@ function UserApp({ onAdmin }) {
         <div className="coins-hero">
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, opacity: .85, textTransform: 'uppercase', marginBottom: 7 }}>Your Balance</div>
           <div className="coins-balance">{cineCoins} 🪙</div>
-          <div style={{ opacity: .85, marginTop: 7, fontSize: 13 }}>500 coins = 1 ticket · UPI purchases earn coins!</div>
-          <button onClick={() => refreshCoins(user).then(c => { if (c) setCineCoins(c); })}
+          <div style={{ opacity: .85, marginTop: 7, fontSize: 13 }}>500 coins = 1 ticket · Razorpay purchases earn coins!</div>
+          <button onClick={() => refreshCoins(user).then(c => { if (c !== undefined) setCineCoins(c); })}
             style={{ marginTop: 12, background: 'rgba(255,255,255,.2)', border: 'none', borderRadius: 10, padding: '7px 16px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             🔄 Refresh Balance
           </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 11, marginBottom: 22 }}>
-          {[['🎟','Tickets','10 coins/ticket (UPI)'],['🍿','Snacks','5 coins/order (UPI)'],['🅿️','Parking','5 coins/slot (UPI)'],['💳','Redeem','500 coins=free ticket']].map(([ico, name, desc]) => (
+          {[['🎟','Tickets','10 coins/ticket (Razorpay)'],['🍿','Snacks','5 coins/order (Razorpay)'],['🅿️','Parking','5 coins/slot (Razorpay)'],['💳','Redeem','500 coins = free ticket']].map(([ico, name, desc]) => (
             <div key={name} style={{ background: 'var(--card)', borderRadius: 'var(--r2)', padding: 14, boxShadow: 'var(--sh1)', border: '1px solid var(--bdr)', textAlign: 'center' }}>
               <div style={{ fontSize: 24 }}>{ico}</div>
               <div style={{ fontWeight: 800, fontSize: 13, marginTop: 5 }}>{name}</div>

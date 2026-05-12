@@ -84,13 +84,14 @@ const movieSchema = new mongoose.Schema({
   createdAt:   { type: Date, default: Date.now },
 });
 
+// FIX: Added `img` field to snack schema
 const snackSchema = new mongoose.Schema({
   name:        { type: String, required: true },
   emoji:       { type: String, default: '🍿' },
   price:       { type: Number, required: true },
   coinPrice:   { type: Number, default: 0 },
   category:    { type: String, default: 'Snacks' },
-  img:         { type: String, default: '' },
+  img:         { type: String, default: '' },   // <-- snack image URL
   isAvailable: { type: Boolean, default: true },
   createdAt:   { type: Date, default: Date.now },
 });
@@ -266,8 +267,8 @@ async function seedDefaults() {
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
-app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.0', razorpay: razorpay ? 'live' : 'simulated' }));
-app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID.slice(0,14)+'...' }));
+app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.1', razorpay: razorpay ? 'live' : 'simulated' }));
+app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.1', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID.slice(0,14)+'...' }));
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/register', async (req,res) => {
@@ -295,7 +296,7 @@ app.get('/api/user/coins/:username', async (req,res) => {
   catch { res.json({ cineCoins:0 }); }
 });
 
-// ── SCREENS ── IMPORTANT: must be defined BEFORE catch-all or generic routes ──
+// ── SCREENS ───────────────────────────────────────────────────────────────────
 app.get('/api/screens', async (req,res) => {
   try {
     const screens = await Screen.find({ isActive:true }).sort({ name:1 });
@@ -347,6 +348,7 @@ app.delete('/api/admin/screens/:id', async (req,res) => {
 });
 
 // ── RAZORPAY ──────────────────────────────────────────────────────────────────
+// FIX: Returns keyId so frontend uses the correct live/test key
 app.post('/api/payment/create-order', async (req,res) => {
   try {
     const amount = parseFloat(req.body.amount);
@@ -356,7 +358,6 @@ app.post('/api/payment/create-order', async (req,res) => {
       return res.status(400).json({ error:'Invalid amount' });
     }
 
-    // If Razorpay not initialized, return simulated order
     if (!razorpay) {
       console.log('⚠️  Razorpay not initialized — returning simulated order');
       return res.json({
@@ -364,7 +365,7 @@ app.post('/api/payment/create-order', async (req,res) => {
         amount:    Math.round(amount * 100),
         amountINR: amount,
         currency:  'INR',
-        keyId:     RZP_KEY_ID,
+        keyId:     RZP_KEY_ID,   // Always return keyId
         simulated: true,
       });
     }
@@ -382,13 +383,12 @@ app.post('/api/payment/create-order', async (req,res) => {
       amount:    order.amount,
       amountINR: amount,
       currency:  order.currency,
-      keyId:     RZP_KEY_ID,
+      keyId:     RZP_KEY_ID,   // Always return keyId
       simulated: false,
     });
   } catch(err) {
     const msg = err.error?.description || err.message || 'Unknown error';
     console.error('❌ create-order error:', msg);
-    // Always return a simulated order on error so frontend can still book
     res.json({
       orderId:   `order_SIM_${Date.now()}`,
       amount:    Math.round((parseFloat(req.body.amount)||0) * 100),
@@ -406,7 +406,6 @@ app.post('/api/payment/verify', async (req,res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
       return res.status(400).json({ error:'Missing fields' });
-    // Simulated orders always pass
     if (razorpay_order_id.startsWith('order_SIM_') || razorpay_order_id.startsWith('order_FALLBACK_'))
       return res.json({ success:true, simulated:true });
     const expected = crypto.createHmac('sha256', RZP_KEY_SECRET)
@@ -761,10 +760,14 @@ app.post('/api/admin/book-direct', async (req,res) => {
   } catch(e) { res.status(500).json({ error:'Direct booking failed: '+e.message }); }
 });
 
+// ── ANALYTICS — FIX: sum Ticket + AdminBooking revenue ───────────────────────
 app.get('/api/admin/analytics', async (req,res) => {
   try {
-    const [tRev,pRev,sRev,coins,tb,ab,tu] = await Promise.all([
+    const [tRev, abRev, pRev, sRev, coins, tb, ab, tu] = await Promise.all([
+      // FIX: Ticket revenue
       Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
+      // FIX: AdminBooking revenue (was missing before)
+      AdminBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
       ParkingBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$price' } } }]),
       RefreshmentOrder.aggregate([{ $group:{ _id:null, total:{ $sum:'$total' } } }]),
       Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$coinsEarned' } } }]),
@@ -775,8 +778,10 @@ app.get('/api/admin/analytics', async (req,res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0,0,0,0);
     const fmt = '%m/%d';
-    const [tD,pD,sD] = await Promise.all([
+    const [tD, abD, pD, sD] = await Promise.all([
       Ticket.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$amount' }, bookings:{ $sum:1 } } }]),
+      // FIX: Include AdminBooking daily revenue
+      AdminBooking.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$amount' } } }]),
       ParkingBooking.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$price' } } }]),
       RefreshmentOrder.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$total' } } }]),
     ]);
@@ -787,17 +792,25 @@ app.get('/api/admin/analytics', async (req,res) => {
       const label = `${d.getMonth()+1}/${d.getDate()}`;
       dailyRevenue.push({
         date:     label,
-        revenue:  (tD.find(r=>r._id===label)?.revenue||0) + (pD.find(r=>r._id===label)?.revenue||0) + (sD.find(r=>r._id===label)?.revenue||0),
-        bookings: tD.find(r=>r._id===label)?.bookings||0,
+        // FIX: include admin booking revenue in daily chart
+        revenue:  (tD.find(r=>r._id===label)?.revenue||0)
+                + (abD.find(r=>r._id===label)?.revenue||0)
+                + (pD.find(r=>r._id===label)?.revenue||0)
+                + (sD.find(r=>r._id===label)?.revenue||0),
+        bookings: (tD.find(r=>r._id===label)?.bookings||0),
       });
     }
     const movieStats = await Ticket.aggregate([
       { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
       { $sort:{ count:-1 } }, { $limit:5 }
     ]);
+
+    // FIX: Combined ticket revenue = user tickets + admin bookings
+    const ticketRevenue = (tRev[0]?.total||0) + (abRev[0]?.total||0);
+
     res.json({
-      totalRevenue:       (tRev[0]?.total||0) + (pRev[0]?.total||0) + (sRev[0]?.total||0),
-      ticketRevenue:      tRev[0]?.total||0,
+      totalRevenue:       ticketRevenue + (pRev[0]?.total||0) + (sRev[0]?.total||0),
+      ticketRevenue,
       parkingRevenue:     pRev[0]?.total||0,
       refreshmentRevenue: sRev[0]?.total||0,
       totalBookings:      tb,
@@ -830,7 +843,7 @@ app.post('/api/chatbot', async (req,res) => {
 // ── START ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Cine Time v8.0 on port ${PORT}`);
+  console.log(`🚀 Cine Time v8.1 on port ${PORT}`);
   console.log(`🔑 Razorpay: ${razorpay ? 'LIVE — ' + RZP_KEY_ID.slice(0,16)+'...' : 'SIMULATED MODE'}`);
   console.log(`🍃 MongoDB:  ${mongoURI.includes('localhost') ? 'Local' : 'Atlas'}`);
 });

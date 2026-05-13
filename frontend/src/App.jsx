@@ -5,18 +5,18 @@ const API = 'https://cinetime-bq7l.onrender.com/api';
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = '7777';
 
-/* ─── LOCAL DEFAULTS ─────────────────────────────────────────────────────────*/
+/* ─── LOCAL DEFAULTS ────────────────────────────────────────────────────────*/
 const DEFAULT_SCREENS = [
   { _id:'sc-1', name:'Screen 1',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Standard', basePrice:150, isActive:true },
   { _id:'sc-2', name:'Screen 2',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Premium',  basePrice:180, isActive:true },
   { _id:'sc-3', name:'IMAX Hall', rows:10, seatsPerRow:12, capacity:120, screenType:'IMAX',     basePrice:220, isActive:true },
 ];
 const DEFAULT_MOVIES = [
-  { _id:'m1', title:'Leo',           genre:'Action/Thriller', language:'Tamil',   duration:'2h 44m', rating:8.2, isUpcoming:false, timings:['10:00 AM','2:30 PM','6:00 PM','10:30 PM'], shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, img:'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Leo_2023_film_poster.jpg/220px-Leo_2023_film_poster.jpg', description:'A mild-mannered man who runs a food business has his past catch up with him.' },
-  { _id:'m2', title:'Vikram',        genre:'Action',          language:'Tamil',   duration:'2h 55m', rating:8.4, isUpcoming:false, timings:['10:15 AM','2:15 PM','6:15 PM','10:15 PM'], shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, img:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Vikram_2022_film_poster.jpg/220px-Vikram_2022_film_poster.jpg', description:'A special agent investigates a series of murders by masked men.' },
-  { _id:'m3', title:'Oppenheimer',   genre:'Biography/Drama', language:'English', duration:'3h 0m',  rating:8.9, isUpcoming:false, timings:['11:00 AM','3:00 PM','7:00 PM'],            shows:[], pricing:{morning:130,afternoon:160,evening:190,night:210}, img:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Oppenheimer_%28film%29.jpg/220px-Oppenheimer_%28film%29.jpg', description:'The story of J. Robert Oppenheimer and the Manhattan Project.' },
-  { _id:'m4', title:'Jawan',         genre:'Action/Drama',    language:'Hindi',   duration:'2h 49m', rating:7.5, isUpcoming:false, timings:['9:30 AM','1:00 PM','5:30 PM','9:30 PM'],   shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, img:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7e/Jawan_film_poster.jpg/220px-Jawan_film_poster.jpg', description:'A prison warden recruits women to fight injustice.' },
-  { _id:'m5', title:'KGF Chapter 3', genre:'Action',          language:'Kannada', duration:'2h 40m', rating:0,   isUpcoming:true,  timings:[],                                          shows:[], pricing:{morning:150,afternoon:180,evening:210,night:250}, img:'', description:'The saga of Rocky continues in an epic final chapter.' },
+  { _id:'m1', title:'Leo',           genre:'Action/Thriller', language:'Tamil',   duration:'2h 44m', rating:8.2, isUpcoming:false, timings:['10:00 AM','2:30 PM','6:00 PM','10:30 PM'], shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, seatCategories:[], img:'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Leo_2023_film_poster.jpg/220px-Leo_2023_film_poster.jpg', description:'A mild-mannered man who runs a food business has his past catch up with him.' },
+  { _id:'m2', title:'Vikram',        genre:'Action',          language:'Tamil',   duration:'2h 55m', rating:8.4, isUpcoming:false, timings:['10:15 AM','2:15 PM','6:15 PM','10:15 PM'], shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, seatCategories:[], img:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Vikram_2022_film_poster.jpg/220px-Vikram_2022_film_poster.jpg', description:'A special agent investigates a series of murders by masked men.' },
+  { _id:'m3', title:'Oppenheimer',   genre:'Biography/Drama', language:'English', duration:'3h 0m',  rating:8.9, isUpcoming:false, timings:['11:00 AM','3:00 PM','7:00 PM'],            shows:[], pricing:{morning:130,afternoon:160,evening:190,night:210}, seatCategories:[], img:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Oppenheimer_%28film%29.jpg/220px-Oppenheimer_%28film%29.jpg', description:'The story of J. Robert Oppenheimer and the Manhattan Project.' },
+  { _id:'m4', title:'Jawan',         genre:'Action/Drama',    language:'Hindi',   duration:'2h 49m', rating:7.5, isUpcoming:false, timings:['9:30 AM','1:00 PM','5:30 PM','9:30 PM'],   shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, seatCategories:[], img:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7e/Jawan_film_poster.jpg/220px-Jawan_film_poster.jpg', description:'A prison warden recruits women to fight injustice.' },
+  { _id:'m5', title:'KGF Chapter 3', genre:'Action',          language:'Kannada', duration:'2h 40m', rating:0,   isUpcoming:true,  timings:[],                                          shows:[], pricing:{morning:150,afternoon:180,evening:210,night:250}, seatCategories:[], img:'', description:'The saga of Rocky continues in an epic final chapter.' },
 ];
 const DEFAULT_SNACKS = [
   { _id:'sn1',  name:'Popcorn (Large)',       emoji:'🍿', price:180, coinPrice:90,  category:'Snacks', img:'' },
@@ -45,12 +45,27 @@ function mergeArr(remote, local, key='title') {
   return m;
 }
 
-/* ─── SCREEN UTILS ───────────────────────────────────────────────────────────*/
+/* ─── SCREEN / SEAT CATEGORY UTILS ─────────────────────────────────────────*/
 const SC_COLOR  = {Standard:'#007AFF',Premium:'#8B5CF6',IMAX:'#FF375F','4DX':'#FF9500',Dolby:'#34C759'};
 const SC_BADGE  = {Standard:'🎬',Premium:'⭐',IMAX:'🔷','4DX':'💥',Dolby:'🔊'};
 
-/* ─── SIMULATED PAYMENT HELPER ───────────────────────────────────────────────*/
-// Returns a promise that resolves with a sim payment ID after 2 seconds
+// Given seatCategories, rows, seatsPerRow — return the category for seat index (0-based)
+function getSeatCat(seatIdx, seatsPerRow, seatCategories) {
+  if (!seatCategories || !seatCategories.length) return null;
+  const rowNum = Math.floor(seatIdx / seatsPerRow) + 1;
+  return seatCategories.find(c => rowNum >= c.fromRow && rowNum <= c.toRow) || null;
+}
+
+// Compute total for selected seats with zone pricing
+function calcZoneTotal(selectedSeats, seatsPerRow, seatCategories, fallback) {
+  if (!seatCategories || !seatCategories.length) return selectedSeats.length * fallback;
+  return selectedSeats.reduce((sum, s) => {
+    const cat = getSeatCat(s, seatsPerRow, seatCategories);
+    return sum + (cat ? cat.price : fallback);
+  }, 0);
+}
+
+/* ─── SIMULATED PAYMENT ──────────────────────────────────────────────────────*/
 function simulatePayment(amount) {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -86,18 +101,15 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 @keyframes glow{0%,100%{box-shadow:0 0 20px rgba(255,55,95,.4)}50%{box-shadow:0 0 40px rgba(255,55,95,.8)}}
 @keyframes starBlink{0%,100%{opacity:1}50%{opacity:.2}}
 @keyframes coinPop{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
-@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@keyframes progressFill{from{width:0}to{width:100%}}
 .page{animation:fadeUp .35s cubic-bezier(.34,1.4,.64,1) both}
 .pop{animation:pop .3s cubic-bezier(.34,1.5,.64,1) both}
 .coin-anim{animation:coinPop .4s ease}
 .toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:#1C1C1E;color:#fff;border-radius:14px;padding:11px 22px;font-size:14px;font-weight:700;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.3);animation:pop .25s ease;pointer-events:none;white-space:nowrap;max-width:92vw;text-align:center}
-/* PAYMENT OVERLAY */
 .pay-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:3000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px)}
 .pay-overlay-card{background:#fff;border-radius:var(--r4);padding:40px 32px;text-align:center;width:90%;max-width:340px;box-shadow:var(--sh3)}
 .pay-progress{width:100%;height:5px;background:var(--bg2);border-radius:10px;overflow:hidden;margin:18px 0}
 .pay-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:10px;animation:progressFill 2s linear forwards}
-@keyframes progressFill{from{width:0}to{width:100%}}
-/* AUTH */
 .auth-full{min-height:100vh;display:flex;overflow:hidden}
 .auth-left{flex:1;background:linear-gradient(145deg,#0D0014 0%,#1a0026 40%,#FF375F 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;position:relative;overflow:hidden}
 .auth-left-bg{position:absolute;inset:0;background:radial-gradient(circle at 30% 50%,rgba(255,55,95,.25),transparent 60%),radial-gradient(circle at 80% 20%,rgba(255,107,135,.18),transparent 50%);pointer-events:none}
@@ -133,8 +145,9 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 @media(max-width:700px){.nav-links{display:none}.mob-nav{display:flex}}
 .adm-login-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px)}
 .adm-login-card{background:#0A0A12;border:1px solid rgba(255,255,255,.12);border-radius:var(--r4);padding:38px 34px;width:100%;max-width:350px;box-shadow:0 40px 80px rgba(0,0,0,.6);animation:pop .3s ease;text-align:center}
-.adm-inp{width:100%;padding:12px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:13px;font-family:'Figtree',sans-serif;font-size:15px;font-weight:600;color:#fff;outline:none;margin-bottom:10px}
+.adm-inp{width:100%;padding:11px 13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:11px;font-family:'Figtree',sans-serif;font-size:13px;color:#fff;outline:none;margin-bottom:9px}
 .adm-inp:focus{border-color:var(--accent)}
+.adm-inp::placeholder{color:rgba(255,255,255,.3)}
 .btn{width:100%;padding:13px;border:none;border-radius:15px;font-family:'Figtree',sans-serif;font-size:15px;font-weight:800;cursor:pointer;transition:all .2s}
 .btn:active{transform:scale(.97)}.btn:disabled{opacity:.35;cursor:not-allowed}
 .btn-red{background:var(--accent);color:#fff;box-shadow:0 6px 20px rgba(255,55,95,.28)}.btn-red:hover:not(:disabled){transform:scale(1.02)}
@@ -251,9 +264,6 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .adm-stat-n{font-size:26px;font-weight:900;color:#fff}
 .adm-stat-l{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-top:4px}
 .adm-row{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:13px;padding:14px 18px;margin-bottom:9px}
-.adm-inp{width:100%;padding:11px 13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:11px;font-family:'Figtree',sans-serif;font-size:13px;color:#fff;outline:none;margin-bottom:9px}
-.adm-inp:focus{border-color:var(--accent)}
-.adm-inp::placeholder{color:rgba(255,255,255,.3)}
 .adm-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;display:block}
 .adm-sel{width:100%;padding:11px 13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:11px;font-family:'Figtree',sans-serif;font-size:13px;color:#fff;outline:none;margin-bottom:9px;cursor:pointer}
 .adm-sel option{background:#1a1a2e;color:#fff}
@@ -279,6 +289,11 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .vault-search{width:100%;padding:10px 14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:11px;font-family:'Figtree',sans-serif;font-size:13px;color:#fff;outline:none;margin-bottom:14px}
 .vault-search::placeholder{color:rgba(255,255,255,.3)}
 .pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.zone-row{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.04);border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid rgba(255,255,255,.07)}
+.zone-row input{flex:1;padding:8px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:8px;font-family:'Figtree',sans-serif;font-size:12px;color:#fff;outline:none}
+.zone-row input:focus{border-color:var(--accent)}
+.zone-row input::placeholder{color:rgba(255,255,255,.25)}
+.cat-zone-pill{padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:.3px}
 `;
 
 /* ─── UTILS ──────────────────────────────────────────────────────────────────*/
@@ -302,7 +317,7 @@ function RevenueChart({data}){
   ))}</div>;
 }
 
-/* ─── SIMULATED PAYMENT OVERLAY ──────────────────────────────────────────────*/
+/* ─── PAYMENT OVERLAY ────────────────────────────────────────────────────────*/
 function PaymentOverlay({amount, onComplete}) {
   useEffect(()=>{
     const t = setTimeout(()=>onComplete(), 2100);
@@ -379,7 +394,7 @@ function Chatbot({movies}){
     const current=movies.filter(m=>!m.isUpcoming).map(m=>m.title);
     if(lw.includes('upcoming')) r=upcoming.length?`Coming soon: ${upcoming.join(', ')} 🎬`:'No upcoming movies announced yet!';
     else if(lw.includes('movie')||lw.includes('showing')) r=`Now showing: ${current.join(', ')} 🎬`;
-    else if(lw.includes('price')||lw.includes('ticket')) r='🎟 Morning ₹120 · Afternoon ₹150 · Evening ₹180 · Night ₹200. Or 500 CineCoins!';
+    else if(lw.includes('price')||lw.includes('ticket')) r='🎟 Zone pricing: Balcony · Upper · Middle · Lower — prices vary by movie. Check the seat map!';
     else if(lw.includes('coin')) r='🪙 Earn 10/ticket · 5/snack. 500 = free ticket!';
     else if(lw.includes('cancel')||lw.includes('refund')) r='❌ Cancel anytime from My Bookings. Paid amount goes to your CineWallet!';
     else if(lw.includes('wallet')) r='💰 CineWallet holds your refunds — use for future bookings!';
@@ -414,7 +429,7 @@ function Chatbot({movies}){
   );
 }
 
-/* ─── ADMIN LOGIN MODAL ──────────────────────────────────────────────────────*/
+/* ─── ADMIN LOGIN ─────────────────────────────────────────────────────────────*/
 function AdminLoginModal({onSuccess,onClose}){
   const [u,setU]=useState(''); const [p,setP]=useState(''); const [err,setErr]=useState(''); const [loading,setLoading]=useState(false);
   const go=async()=>{
@@ -468,7 +483,7 @@ function AdminApp({onBack}){
   const [vaultSearch,setVaultSearch]=useState('');
   const [vaultLoading,setVaultLoading]=useState(false);
 
-  // Movie form — includes pricing fields + isUpcoming
+  // Movie form
   const emptyM={title:'',genre:'',language:'Tamil',duration:'',rating:'8.0',img:'',description:'',isUpcoming:false,priceMorning:'120',priceAfternoon:'150',priceEvening:'180',priceNight:'200'};
   const [mForm,setMForm]=useState(emptyM);
   const [editMId,setEditMId]=useState(null);
@@ -478,7 +493,16 @@ function AdminApp({onBack}){
   const [nst,setNst]=useState('');
   const [nss,setNss]=useState('');
 
-  // Screen form — includes basePrice
+  // Seat Categories for movie form
+  const emptyCat={name:'',fromRow:'',toRow:'',price:'',color:'#007AFF'};
+  const [seatCats,setSeatCats]=useState([]);
+  const [newCat,setNewCat]=useState(emptyCat);
+  const CAT_PRESETS=[
+    {name:'Balcony',color:'#8B5CF6'},{name:'Upper',color:'#007AFF'},
+    {name:'Middle',color:'#34C759'},{name:'Lower',color:'#FF9500'},
+  ];
+
+  // Screen form
   const emptyS={name:'',rows:'8',seatsPerRow:'10',screenType:'Standard',basePrice:'150'};
   const [sForm,setSForm]=useState(emptyS);
   const [editSId,setEditSId]=useState(null);
@@ -500,7 +524,7 @@ function AdminApp({onBack}){
   const saveSn=(s)=>{setSnacks(s);LS.set('ct_admin_snacks',s);};
   const saveSc=(s)=>{setScreens(s);LS.set('ct_screens',s);};
 
-  /* ── FETCH ALL ──────────────────────────────────────────────*/
+  /* ── FETCH ALL ─────────────────────────────────────────────*/
   const fetchAll=useCallback(async()=>{
     setRefreshing(true);
     const results=await Promise.allSettled([
@@ -512,37 +536,27 @@ function AdminApp({onBack}){
       axios.get(`${API}/screens`),
     ]);
     const [bk,an,us,mv,sn,sc]=results;
-    if(bk.status==='fulfilled'){
-      const d=bk.value.data;
-      setAllTickets(d.tickets||[]);setAllAdminBks(d.adminBookings||[]);setAllRefresh(d.refreshments||[]);
-    }
+    if(bk.status==='fulfilled'){const d=bk.value.data;setAllTickets(d.tickets||[]);setAllAdminBks(d.adminBookings||[]);setAllRefresh(d.refreshments||[]);}
     if(an.status==='fulfilled') setAnalytics(an.value.data);
     if(us.status==='fulfilled') setUsers(us.value.data);
     if(mv.status==='fulfilled'&&mv.value.data?.length) saveM(mergeArr(mv.value.data,DEFAULT_MOVIES));
-    if(sn.status==='fulfilled'&&sn.value.data?.length){
-      const m=[...DEFAULT_SNACKS];sn.value.data.forEach(x=>{if(!m.find(s=>s.name===x.name))m.push(x);});saveSn(m);
-    }
-    if(sc.status==='fulfilled'&&sc.value.data){
-      const data=sc.value.data;
-      if(Array.isArray(data)&&data.length){ saveSc(data); setScreensOnline(true); }
-      else setScreensOnline(false);
-    }else{ setScreensOnline(false); }
+    if(sn.status==='fulfilled'&&sn.value.data?.length){const m=[...DEFAULT_SNACKS];sn.value.data.forEach(x=>{if(!m.find(s=>s.name===x.name))m.push(x);});saveSn(m);}
+    if(sc.status==='fulfilled'&&sc.value.data){const data=sc.value.data;if(Array.isArray(data)&&data.length){saveSc(data);setScreensOnline(true);}else setScreensOnline(false);}
+    else setScreensOnline(false);
     setRefreshing(false);
   },[]);
 
   const fetchVault=useCallback(async(q='')=>{
     setVaultLoading(true);
-    try{
-      const r=await axios.get(`${API}/admin/vault${q?`?search=${encodeURIComponent(q)}`:''}`);
-      setVault(r.data);
-    }catch{ setVault([]); }
+    try{const r=await axios.get(`${API}/admin/vault${q?`?search=${encodeURIComponent(q)}`:''}`);setVault(r.data);}
+    catch{setVault([]);}
     setVaultLoading(false);
   },[]);
 
   useEffect(()=>{fetchAll();},[fetchAll]);
-  useEffect(()=>{ if(tab==='vault') fetchVault(vaultSearch); },[tab,vaultSearch,fetchVault]);
+  useEffect(()=>{if(tab==='vault')fetchVault(vaultSearch);},[tab,vaultSearch,fetchVault]);
 
-  /* ── SEAT MAP ───────────────────────────────────────────────*/
+  /* ── SEAT MAP ──────────────────────────────────────────────*/
   const loadSeatMap=async(mTitle,show)=>{
     try{
       const q=show.screenName?`?screen=${encodeURIComponent(show.screenName)}`:'';
@@ -555,14 +569,15 @@ function AdminApp({onBack}){
   const aSpr=activeShow?(activeShow.show.seatsPerRow||10):10;
   const bookedCnt=Object.values(seatMap).filter(Boolean).length;
 
-  /* ── MOVIE SAVE ─────────────────────────────────────────────*/
+  /* ── MOVIE SAVE ────────────────────────────────────────────*/
   const saveMovie=async()=>{
     if(!mForm.title.trim()){showToast('❌ Title required');return;}
     setMSaving(true);
     const pricing={morning:parseFloat(mForm.priceMorning)||120,afternoon:parseFloat(mForm.priceAfternoon)||150,evening:parseFloat(mForm.priceEvening)||180,night:parseFloat(mForm.priceNight)||200};
     const pl={title:mForm.title.trim(),genre:mForm.genre,language:mForm.language,duration:mForm.duration,
       rating:parseFloat(mForm.rating)||8.0,shows:schedule,timings:schedule.map(s=>s.time),
-      pricing, img:mForm.img||'',description:mForm.description||'',isUpcoming:mForm.isUpcoming||false};
+      pricing, seatCategories:seatCats,
+      img:mForm.img||'',description:mForm.description||'',isUpcoming:mForm.isUpcoming||false};
     try{
       let saved;
       if(editMId&&!editMId.startsWith('local-')&&!editMId.startsWith('m')&&editMId.length===24){
@@ -574,22 +589,20 @@ function AdminApp({onBack}){
       const local=editMId?movies.map(m=>m._id===editMId?{...pl,_id:editMId}:m):[...movies,{...pl,_id:`local-${Date.now()}`}];
       saveM(local);showToast('⚠️ Saved locally');
     }
-    setEditMId(null);setImgPrev('');setMForm(emptyM);setSchedule([]);setMSaving(false);
+    setEditMId(null);setImgPrev('');setMForm(emptyM);setSchedule([]);setSeatCats([]);setMSaving(false);
   };
 
-  // Delete → Archive
   const delMovie=async(id,title)=>{
-    if(!window.confirm(`Archive "${title}" to Movie Vault? Booking data is preserved.`))return;
+    if(!window.confirm(`Archive "${title}" to Movie Vault?`))return;
     saveM(movies.filter(m=>m._id!==id));
     if(id&&!id.startsWith('local-')&&!id.startsWith('m')&&id.length===24){
       const r=await axios.delete(`${API}/admin/movies/${id}`).catch(()=>null);
-      if(r?.data){showToast(`🗃 Archived! ${r.data.totalTickets} tickets, ₹${r.data.totalRevenue} revenue logged.`);}
+      if(r?.data){showToast(`🗃 Archived! ${r.data.totalTickets} tickets, ₹${r.data.totalRevenue} revenue.`);}
       else showToast('🗃 Archived locally.');
-    }else{showToast('🗃 Removed from local.');}
-    if(tab==='vault') fetchVault(vaultSearch);
+    }else{showToast('🗃 Removed locally.');}
+    if(tab==='vault')fetchVault(vaultSearch);
   };
 
-  // Toggle upcoming
   const toggleUpcoming=async(id,current)=>{
     try{
       await axios.put(`${API}/admin/movies/${id}/toggle-upcoming`);
@@ -608,7 +621,13 @@ function AdminApp({onBack}){
     setNst('');setNss('');
   };
 
-  /* ── SCREEN SAVE ─────────────────────────────────────────────*/
+  const addSeatCat=()=>{
+    if(!newCat.name||!newCat.fromRow||!newCat.toRow||!newCat.price){showToast('❌ Fill all zone fields');return;}
+    setSeatCats(p=>[...p,{...newCat,fromRow:parseInt(newCat.fromRow),toRow:parseInt(newCat.toRow),price:parseFloat(newCat.price)}]);
+    setNewCat(emptyCat);
+  };
+
+  /* ── SCREEN SAVE ───────────────────────────────────────────*/
   const saveScreen=async()=>{
     if(!sForm.name.trim()){showToast('❌ Name required');return;}
     setSSaving(true);
@@ -617,33 +636,26 @@ function AdminApp({onBack}){
     const pl={name:sForm.name.trim(),rows:r,seatsPerRow:spr,capacity:r*spr,screenType:sForm.screenType||'Standard',basePrice:parseFloat(sForm.basePrice)||150};
     try{
       let saved;
-      if(editSId&&!editSId.startsWith('sc-')){
-        saved=(await axios.put(`${API}/admin/screens/${editSId}`,pl)).data;
-        saveSc(screens.map(s=>s._id===editSId?saved:s));
-        setScreensOnline(true);
-      }else{
-        saved=(await axios.post(`${API}/admin/screens`,pl)).data;
-        const updated=editSId?screens.map(s=>s._id===editSId?saved:s):[...screens,saved];
-        saveSc(updated);setScreensOnline(true);
-      }
+      if(editSId&&!editSId.startsWith('sc-')){saved=(await axios.put(`${API}/admin/screens/${editSId}`,pl)).data;saveSc(screens.map(s=>s._id===editSId?saved:s));setScreensOnline(true);}
+      else{saved=(await axios.post(`${API}/admin/screens`,pl)).data;const updated=editSId?screens.map(s=>s._id===editSId?saved:s):[...screens,saved];saveSc(updated);setScreensOnline(true);}
       showToast('✅ Screen saved!');
     }catch(e){
       const localId=editSId||`sc-${Date.now()}`;
       const newSc={...pl,_id:localId,isActive:true,createdAt:new Date().toISOString()};
       const updated=editSId?screens.map(s=>s._id===editSId?newSc:s):[...screens,newSc];
-      saveSc(updated);setScreensOnline(false);
-      showToast('⚠️ Saved locally — redeploy backend to persist');
+      saveSc(updated);setScreensOnline(false);showToast('⚠️ Saved locally');
     }
     setEditSId(null);setSForm(emptyS);setSSaving(false);
   };
+
   const delScreen=async(id)=>{
     if(!window.confirm('Remove?'))return;
     saveSc(screens.filter(s=>s._id!==id));
-    if(!id.startsWith('sc-')) await axios.delete(`${API}/admin/screens/${id}`).catch(()=>{});
+    if(!id.startsWith('sc-'))await axios.delete(`${API}/admin/screens/${id}`).catch(()=>{});
     showToast('🗑 Screen removed');
   };
 
-  /* ── SNACK SAVE ─────────────────────────────────────────────*/
+  /* ── SNACK SAVE ────────────────────────────────────────────*/
   const saveSnack=async()=>{
     if(!snForm.name.trim()){showToast('❌ Name required');return;}
     const ns={...snForm,_id:editSnId||`sn-${Date.now()}`,price:Number(snForm.price)||0,coinPrice:Number(snForm.coinPrice)||0,img:snForm.img||''};
@@ -651,6 +663,7 @@ function AdminApp({onBack}){
     else{saveSn([...snacks,ns]);await axios.post(`${API}/admin/snacks`,ns).catch(()=>{});}
     setEditSnId(null);setSnForm(emptySn);setSnImgPrev('');showToast('✅ Item saved!');
   };
+
   const delSnack=async(id)=>{
     if(!window.confirm('Delete?'))return;
     saveSn(snacks.filter(s=>s._id!==id));
@@ -658,7 +671,7 @@ function AdminApp({onBack}){
     showToast('🗑 Deleted');
   };
 
-  /* ── DIRECT BOOK ────────────────────────────────────────────*/
+  /* ── DIRECT BOOK ───────────────────────────────────────────*/
   const directBook=async()=>{
     const {username,movieName,timing,screenName,seats,amount,notes}=bForm;
     if(!username.trim()||!movieName.trim()||!timing.trim()||!seats.trim()){showToast('❌ Fill all fields');return;}
@@ -672,7 +685,10 @@ function AdminApp({onBack}){
         username:username.trim(),userUUID:'admin-direct',movieName:movieName.trim(),timing:timing.trim(),
         screenName:screenName||show?.screenName||'',
         rows:show?.rows||8,seatsPerRow:show?.seatsPerRow||10,
-        selectedSeats:sa,amount:parseInt(amount)||0,notes:notes.trim(),isUpcoming:mv?.isUpcoming||false});
+        selectedSeats:sa,amount:parseInt(amount)||0,notes:notes.trim(),
+        isUpcoming:mv?.isUpcoming||false,
+        seatCategories:mv?.seatCategories||[],
+      });
       setBResult(res.data);showToast('✅ Booking created!');setBForm(emptyB);fetchAll();
     }catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
     setBLoading(false);
@@ -695,8 +711,7 @@ function AdminApp({onBack}){
             </div>
             {viewTicket.eTicketQR&&viewTicket.status!=='cancelled'
               ?<img src={viewTicket.eTicketQR} alt="QR" style={{width:180,borderRadius:12,border:'3px solid white',boxShadow:'var(--sh2)',marginBottom:12}}/>
-              :<div style={{width:180,height:100,margin:'0 auto 12px',background:'#f5f5f5',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40}}>{viewTicket.status==='cancelled'?'❌':'🎟️'}</div>
-            }
+              :<div style={{width:180,height:100,margin:'0 auto 12px',background:'#f5f5f5',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40}}>{viewTicket.status==='cancelled'?'❌':'🎟️'}</div>}
             <div style={{fontSize:11,color:'#6C6C70',marginBottom:12}}>👤 {viewTicket.username}</div>
             <button className="btn btn-dark btn-sm" onClick={()=>setViewTicket(null)}>Close</button>
           </div>
@@ -711,6 +726,7 @@ function AdminApp({onBack}){
       </nav>
 
       <div className="adm-wrap">
+
         {/* MONITOR */}
         {tab==='monitor'&&(
           <div className="page">
@@ -733,6 +749,7 @@ function AdminApp({onBack}){
                   <div className="adm-stat"><div className="adm-stat-n" style={{color:'var(--accent)'}}>{bookedCnt}</div><div className="adm-stat-l">Booked</div></div>
                   <div className="adm-stat"><div className="adm-stat-n" style={{color:'var(--green)'}}>{cap-bookedCnt}</div><div className="adm-stat-l">Available</div></div>
                   <div className="adm-stat"><div className="adm-stat-n">{cap}</div><div className="adm-stat-l">Capacity</div></div>
+                  <div className="adm-stat"><div className="adm-stat-n" style={{color:'#FFB800'}}>{Math.round((bookedCnt/cap)*100)}%</div><div className="adm-stat-l">Occupancy</div></div>
                 </div>
                 <div style={{display:'flex',gap:14,marginBottom:10,flexWrap:'wrap'}}>
                   {[['rgba(255,255,255,.08)','Available'],['var(--accent)','User Booked'],['#FFB800','Admin Booked']].map(([bg,lbl])=>(
@@ -743,7 +760,7 @@ function AdminApp({onBack}){
                   {[...Array(cap)].map((_,i)=>{
                     const info=seatMap[i];
                     const cls=info?(info.type==='admin'?'a-adm':'a-user'):'a-free';
-                    return <div key={i} className={`adm-seat ${cls}`} style={{width:'100%',aspectRatio:'1',fontSize:Math.max(7,10-Math.floor(cap/40))}} title={info?`👤 ${info.user}`:''}>{i+1}</div>;
+                    return <div key={i} className={`adm-seat ${cls}`} style={{width:'100%',aspectRatio:'1',fontSize:Math.max(7,10-Math.floor(cap/40))}} title={info?`👤 ${info.user}${info.category?' · '+info.category:''}${info.price?' · ₹'+info.price:''}`:''}>{i+1}</div>;
                   })}
                 </div>
                 <button className="btn btn-sm" style={{background:'rgba(255,55,95,.15)',color:'var(--accent)',border:'1px solid rgba(255,55,95,.3)'}}
@@ -846,9 +863,7 @@ function AdminApp({onBack}){
         {tab==='bookings'&&(
           <div className="page">
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase'}}>
-                All Bookings ({allTickets.length+allAdminBks.length+allRefresh.length})
-              </div>
+              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase'}}>All ({allTickets.length+allAdminBks.length+allRefresh.length})</div>
               <button className="chip chip-blue" onClick={fetchAll}>{refreshing?'⏳':'🔄'}</button>
             </div>
             {(()=>{
@@ -914,16 +929,16 @@ function AdminApp({onBack}){
                 ))}
                 <div style={{gridColumn:'1/-1'}}>
                   <label className="adm-lbl">🖼 Poster URL</label>
-                  <input className="adm-inp" placeholder="https://..." value={mForm.img||''} onChange={e=>{setMForm(p=>({...p,img:e.target.value}));setImgPrev(e.target.value);}}/>
+                  <input className="adm-inp" placeholder="https://…" value={mForm.img||''} onChange={e=>{setMForm(p=>({...p,img:e.target.value}));setImgPrev(e.target.value);}}/>
                   {imgPrev&&<img src={imgPrev} alt="prev" style={{width:50,height:72,objectFit:'cover',borderRadius:6,border:'1px solid rgba(255,255,255,.15)',marginTop:8}} onError={e=>e.target.style.display='none'}/>}
                 </div>
                 <div style={{gridColumn:'1/-1'}}>
                   <label className="adm-lbl">Description</label>
                   <input className="adm-inp" placeholder="Short description…" value={mForm.description||''} onChange={e=>setMForm(p=>({...p,description:e.target.value}))}/>
                 </div>
-                {/* ── DYNAMIC PRICING ── */}
+                {/* TIME-SLOT PRICING */}
                 <div style={{gridColumn:'1/-1'}}>
-                  <label className="adm-lbl">💰 Show Pricing (₹)</label>
+                  <label className="adm-lbl">⏰ Time-Slot Base Pricing (₹)</label>
                   <div className="pricing-grid">
                     {[['priceMorning','🌅 Morning'],['priceAfternoon','☀️ Afternoon'],['priceEvening','🌆 Evening'],['priceNight','🌙 Night']].map(([k,l])=>(
                       <div key={k}>
@@ -933,15 +948,43 @@ function AdminApp({onBack}){
                     ))}
                   </div>
                 </div>
-                {/* ── UPCOMING TOGGLE ── */}
+                {/* SEAT ZONE CATEGORIES */}
+                <div style={{gridColumn:'1/-1'}}>
+                  <label className="adm-lbl">🪑 Seat Zone Pricing (Optional — overrides time-slot price)</label>
+                  <div style={{display:'flex',gap:7,flexWrap:'wrap',marginBottom:10}}>
+                    {CAT_PRESETS.map(p=>(
+                      <button key={p.name} className="chip" style={{background:p.color+'22',color:p.color,border:`1px solid ${p.color}44`,fontSize:11}}
+                        onClick={()=>setNewCat(c=>({...c,name:p.name,color:p.color}))}>
+                        {p.name}
+                      </button>
+                    ))}
+                  </div>
+                  {seatCats.map((c,i)=>(
+                    <div key={i} className="zone-row">
+                      <div className="cat-zone-pill" style={{background:c.color+'22',color:c.color,border:`1px solid ${c.color}44`,flexShrink:0}}>{c.name}</div>
+                      <span style={{color:'rgba(255,255,255,.5)',fontSize:11}}>Row {c.fromRow}–{c.toRow}</span>
+                      <span style={{color:'var(--green)',fontWeight:700,fontSize:12}}>₹{c.price}</span>
+                      <button className="chip" style={{background:'rgba(255,55,95,.15)',color:'var(--accent)',padding:'3px 8px',fontSize:11,marginLeft:'auto'}} onClick={()=>setSeatCats(p=>p.filter((_,j)=>j!==i))}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:7,alignItems:'center',background:'rgba(255,255,255,.03)',borderRadius:10,padding:'10px 12px',border:'1px dashed rgba(255,255,255,.1)'}}>
+                    <input className="adm-inp" style={{marginBottom:0}} placeholder="Zone name" value={newCat.name} onChange={e=>setNewCat(p=>({...p,name:e.target.value}))}/>
+                    <input className="adm-inp" style={{marginBottom:0}} type="number" placeholder="From row" value={newCat.fromRow} onChange={e=>setNewCat(p=>({...p,fromRow:e.target.value}))}/>
+                    <input className="adm-inp" style={{marginBottom:0}} type="number" placeholder="To row" value={newCat.toRow} onChange={e=>setNewCat(p=>({...p,toRow:e.target.value}))}/>
+                    <input className="adm-inp" style={{marginBottom:0}} type="number" placeholder="₹ Price" value={newCat.price} onChange={e=>setNewCat(p=>({...p,price:e.target.value}))}/>
+                    <button className="btn btn-green btn-sm" onClick={addSeatCat}>+</button>
+                  </div>
+                </div>
+                {/* UPCOMING TOGGLE */}
                 <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',gap:12,background:'rgba(255,184,0,.06)',borderRadius:11,padding:'12px 14px',border:'1px solid rgba(255,184,0,.15)'}}>
                   <input type="checkbox" id="upcoming-chk" checked={!!mForm.isUpcoming} onChange={e=>setMForm(p=>({...p,isUpcoming:e.target.checked}))} style={{width:18,height:18,cursor:'pointer'}}/>
                   <label htmlFor="upcoming-chk" style={{color:'#FFB800',fontWeight:700,fontSize:13,cursor:'pointer'}}>📅 Mark as Upcoming Movie</label>
                   <span style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>Users can pre-book with an "Upcoming" badge</span>
                 </div>
               </div>
+              {/* SCHEDULE */}
               <div style={{marginTop:12,background:'rgba(255,255,255,.03)',borderRadius:12,padding:14,border:'1px solid rgba(255,255,255,.07)'}}>
-                <div style={{color:'rgba(255,255,255,.7)',fontWeight:700,fontSize:12,marginBottom:10}}>🕐 Show Schedule & Screen Assignment {mForm.isUpcoming&&<span style={{color:'rgba(255,184,0,.7)',fontSize:11}}>(Optional for upcoming)</span>}</div>
+                <div style={{color:'rgba(255,255,255,.7)',fontWeight:700,fontSize:12,marginBottom:10}}>🕐 Show Schedule & Screen Assignment</div>
                 {schedule.map((s,i)=>(
                   <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'rgba(255,255,255,.05)',borderRadius:9,padding:'8px 12px',marginBottom:7}}>
                     <div><span style={{color:'#fff',fontWeight:700}}>{s.time}</span>{s.screenName&&<span style={{color:'rgba(255,255,255,.4)',fontSize:11,marginLeft:8}}>🖥️ {s.screenName} · {s.rows}×{s.seatsPerRow}={s.capacity}</span>}</div>
@@ -959,9 +1002,10 @@ function AdminApp({onBack}){
               </div>
               <div style={{display:'flex',gap:9,marginTop:12}}>
                 <button className="btn btn-red btn-sm" onClick={saveMovie} disabled={mSaving}>{mSaving?<Spin/>:editMId?'💾 Update':'➕ Add Movie'}</button>
-                {editMId&&<button className="btn btn-grey btn-sm" onClick={()=>{setEditMId(null);setImgPrev('');setMForm(emptyM);setSchedule([]);}}>Cancel</button>}
+                {editMId&&<button className="btn btn-grey btn-sm" onClick={()=>{setEditMId(null);setImgPrev('');setMForm(emptyM);setSchedule([]);setSeatCats([]);}}>Cancel</button>}
               </div>
             </div>
+
             <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',margin:'18px 0 10px'}}>{movies.length} movies</div>
             {movies.map(m=>(
               <div key={m._id} className="adm-row" style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -973,6 +1017,9 @@ function AdminApp({onBack}){
                     {m.isUpcoming&&<span style={{background:'rgba(255,184,0,.2)',color:'#FFB800',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>📅 UPCOMING</span>}
                   </div>
                   <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginTop:2}}>{m.genre} · {m.language} · ⭐{m.rating} · 🌅₹{m.pricing?.morning} 🌙₹{m.pricing?.night}</div>
+                  {m.seatCategories?.length>0&&<div style={{display:'flex',gap:5,marginTop:4,flexWrap:'wrap'}}>
+                    {m.seatCategories.map((c,ci)=><span key={ci} className="cat-zone-pill" style={{background:c.color+'22',color:c.color,border:`1px solid ${c.color}33`,fontSize:9}}>{c.name} ₹{c.price}</span>)}
+                  </div>}
                   <div style={{color:'rgba(255,255,255,.3)',fontSize:10,marginTop:2}}>{(m.shows?.length>0?m.shows:(m.timings||[]).map(t=>({time:t,screenName:''}))).map(s=>`${s.time}${s.screenName?` (${s.screenName})`:''}`).join(' · ')}</div>
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,alignItems:'flex-end'}}>
@@ -980,6 +1027,7 @@ function AdminApp({onBack}){
                     <button className="chip chip-blue" onClick={()=>{
                       setEditMId(m._id);setImgPrev(m.img||'');
                       setMForm({...m,rating:String(m.rating||8),isUpcoming:m.isUpcoming||false,priceMorning:String(m.pricing?.morning||120),priceAfternoon:String(m.pricing?.afternoon||150),priceEvening:String(m.pricing?.evening||180),priceNight:String(m.pricing?.night||200)});
+                      setSeatCats(m.seatCategories||[]);
                       setSchedule(m.shows?.length>0?m.shows.map(s=>({time:s.time,screenId:s.screenId||'',screenName:s.screenName||'',screenType:s.screenType||'Standard',rows:s.rows||8,seatsPerRow:s.seatsPerRow||10,capacity:s.capacity||80})):(m.timings||[]).map(t=>({time:t,screenId:'',screenName:'',rows:8,seatsPerRow:10,capacity:80})));
                       window.scrollTo({top:0,behavior:'smooth'});
                     }}>✏️</button>
@@ -1007,7 +1055,7 @@ function AdminApp({onBack}){
                 <div><label className="adm-lbl">Coin Price 🪙</label><input className="adm-inp" type="number" placeholder="75" value={snForm.coinPrice||''} onChange={e=>setSnForm(p=>({...p,coinPrice:e.target.value}))}/></div>
                 <div style={{gridColumn:'1/-1'}}>
                   <label className="adm-lbl">🖼 Image URL (optional)</label>
-                  <input className="adm-inp" placeholder="https://example.com/popcorn.jpg" value={snForm.img||''} onChange={e=>{setSnForm(p=>({...p,img:e.target.value}));setSnImgPrev(e.target.value);}}/>
+                  <input className="adm-inp" placeholder="https://…" value={snForm.img||''} onChange={e=>{setSnForm(p=>({...p,img:e.target.value}));setSnImgPrev(e.target.value);}}/>
                   {snImgPrev&&<img src={snImgPrev} alt="prev" style={{width:60,height:60,objectFit:'cover',borderRadius:10,border:'1px solid rgba(255,255,255,.15)',marginTop:8}} onError={e=>e.target.style.display='none'}/>}
                 </div>
               </div>
@@ -1039,13 +1087,12 @@ function AdminApp({onBack}){
         {tab==='vault'&&(
           <div className="page">
             <div style={{color:'#fff',fontWeight:900,fontSize:20,marginBottom:4}}>🗃 Movie Vault</div>
-            <div style={{color:'rgba(255,255,255,.4)',fontSize:12,marginBottom:18}}>Archived movies — revenue & ticket data preserved. Restore to bring a movie back.</div>
+            <div style={{color:'rgba(255,255,255,.4)',fontSize:12,marginBottom:18}}>Archived movies — revenue & ticket data preserved.</div>
             <input className="vault-search" placeholder="🔍 Search by title…" value={vaultSearch} onChange={e=>setVaultSearch(e.target.value)}/>
             {vaultLoading?<div style={{textAlign:'center',padding:40,color:'rgba(255,255,255,.4)'}}>Loading…</div>:
             vault.length===0?<div style={{textAlign:'center',padding:48,color:'rgba(255,255,255,.25)'}}>
               <div style={{fontSize:48,marginBottom:12}}>🗃</div>
               <div style={{fontSize:16,fontWeight:700}}>Vault is empty</div>
-              <div style={{fontSize:12,marginTop:6}}>Deleted movies appear here with their stats.</div>
             </div>:vault.map(m=>(
               <div key={m._id} className="vault-card">
                 <div style={{display:'flex',alignItems:'center',gap:14}}>
@@ -1055,28 +1102,15 @@ function AdminApp({onBack}){
                     <div style={{color:'rgba(255,255,255,.75)',fontWeight:800,fontSize:14}}>{m.title}</div>
                     <div style={{color:'rgba(255,255,255,.35)',fontSize:11,marginTop:2}}>{m.genre} · {m.language}</div>
                     <div style={{display:'flex',gap:14,marginTop:6}}>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{color:'var(--accent)',fontWeight:900,fontSize:16}}>{m.totalTickets}</div>
-                        <div style={{color:'rgba(255,255,255,.35)',fontSize:9,textTransform:'uppercase',letterSpacing:.5}}>Tickets</div>
-                      </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{color:'var(--green)',fontWeight:900,fontSize:16}}>₹{m.totalRevenue?.toLocaleString()}</div>
-                        <div style={{color:'rgba(255,255,255,.35)',fontSize:9,textTransform:'uppercase',letterSpacing:.5}}>Revenue</div>
-                      </div>
-                      <div style={{textAlign:'center'}}>
-                        <div style={{color:'rgba(255,255,255,.5)',fontWeight:700,fontSize:12}}>{new Date(m.archivedAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'2-digit'})}</div>
-                        <div style={{color:'rgba(255,255,255,.35)',fontSize:9,textTransform:'uppercase',letterSpacing:.5}}>Archived</div>
-                      </div>
+                      <div style={{textAlign:'center'}}><div style={{color:'var(--accent)',fontWeight:900,fontSize:16}}>{m.totalTickets}</div><div style={{color:'rgba(255,255,255,.35)',fontSize:9,textTransform:'uppercase'}}>Tickets</div></div>
+                      <div style={{textAlign:'center'}}><div style={{color:'var(--green)',fontWeight:900,fontSize:16}}>₹{m.totalRevenue?.toLocaleString()}</div><div style={{color:'rgba(255,255,255,.35)',fontSize:9,textTransform:'uppercase'}}>Revenue</div></div>
                     </div>
                   </div>
                 </div>
                 <button className="chip chip-green" onClick={async()=>{
                   if(!window.confirm(`Restore "${m.title}"?`))return;
-                  try{
-                    await axios.post(`${API}/admin/vault/${m._id}/restore`);
-                    fetchVault(vaultSearch); fetchAll();
-                    showToast(`✅ "${m.title}" restored!`);
-                  }catch(e){showToast('❌ Restore failed: '+(e.response?.data?.error||e.message));}
+                  try{await axios.post(`${API}/admin/vault/${m._id}/restore`);fetchVault(vaultSearch);fetchAll();showToast(`✅ "${m.title}" restored!`);}
+                  catch(e){showToast('❌ Restore failed');}
                 }}>↩ Restore</button>
               </div>
             ))}
@@ -1176,7 +1210,11 @@ function UserApp({onAdmin}){
   const [payProcessing,setPayProcessing]=useState(false);
   const [cancelLoading,setCancelLoading]=useState(null);
 
-  const upCoins=useCallback((n,w)=>{setCoins(n);if(w!==undefined)setWallet(w);setCoinKey(k=>k+1);},[]);
+  const upCoins=useCallback((n,w)=>{
+    setCoins(typeof n==='number'?n:0);
+    if(w!==undefined) setWallet(typeof w==='number'?w:0);
+    setCoinKey(k=>k+1);
+  },[]);
 
   useEffect(()=>{
     const onM=(e)=>{if(Array.isArray(e.detail))setMovies(e.detail);};
@@ -1221,8 +1259,16 @@ function UserApp({onAdmin}){
     }catch(e){showToast('❌ '+(e.response?.data?.error||'Auth failed'));}
   };
 
-  const getPrice=()=>{
+  // Price for a specific seat index, considering zone pricing
+  const getSeatPrice=(seatIdx)=>{
     if(!movie||!selShow)return 150;
+    const cats=movie.seatCategories||[];
+    const spr=selShow.seatsPerRow||10;
+    if(cats.length){
+      const cat=getSeatCat(seatIdx,spr,cats);
+      if(cat)return cat.price;
+    }
+    // Fall back to time-slot pricing
     const t=selShow.time;const h=parseInt(t);const am=t.includes('AM');
     if(am&&h!==12)return movie.pricing?.morning||120;
     if(!am&&(h===12||h<=4))return movie.pricing?.afternoon||150;
@@ -1230,7 +1276,19 @@ function UserApp({onAdmin}){
     return movie.pricing?.night||200;
   };
 
-  const tickTot=sel.length*getPrice();
+  // Base price for time-slot (used as fallback label)
+  const getBasePrice=()=>{
+    if(!movie||!selShow)return 150;
+    const cats=movie.seatCategories||[];
+    if(cats.length)return null; // zone pricing active
+    const t=selShow.time;const h=parseInt(t);const am=t.includes('AM');
+    if(am&&h!==12)return movie.pricing?.morning||120;
+    if(!am&&(h===12||h<=4))return movie.pricing?.afternoon||150;
+    if(!am&&h<8)return movie.pricing?.evening||180;
+    return movie.pricing?.night||200;
+  };
+
+  const tickTot=sel.reduce((sum,s)=>sum+getSeatPrice(s),0);
   const cartItems=Object.values(cart).filter(i=>i.qty>0);
   const snkTot=cartItems.reduce((s,i)=>s+i.price*i.qty,0);
   const coinsNeed=sel.length*500;
@@ -1258,71 +1316,53 @@ function UserApp({onAdmin}){
     await refreshCoins(userUUID);
   };
 
-  /* ── BOOK TICKET (Simulated Payment) ────────────────────────────────────*/
-  const confirmBook=async(method='simulated')=>{
-    const doBook=async(simPaymentId)=>{
-      const r=await axios.post(`${API}/book`,{
-        userUUID, username:user, movieName:movie.title, timing:selShow.time,
-        screenName:selShow.screenName||'', rows:selShow.rows||8, seatsPerRow:selShow.seatsPerRow||10,
-        selectedSeats:sel, amount:method==='coins'?0:tickTot,
-        coinsUsed:method==='coins'?coinsNeed:0,
-        paymentMethod:method, simPaymentId:simPaymentId||null,
-        isUpcoming:movie.isUpcoming||false,
-      });
-      setETicket({
-        qr:r.data.eTicketQR||null,
-        movieName:movie.title,
-        timing:selShow.time,
-        screenName:selShow.screenName||'',
-        seats:sel,
-        amount:method==='coins'?0:tickTot,
-        ticketId:r.data.ticketId,
-        simPaymentId,
-        isUpcoming:movie.isUpcoming||false,
-      });
-      upCoins(r.data.newCoinBalance??0, r.data.wallet??wallet);
-      showToast(`✅ Booked!${(r.data.coinsEarned||0)>0?` +${r.data.coinsEarned} 🪙`:''}`);
-      // Also order snacks if in cart
-      if(cartItems.length>0&&method==='simulated'){
-        try{
-          const rr=await axios.post(`${API}/refreshments/order`,{
-            userUUID, username:user, movieName:movie.title, timing:selShow.time,
-            items:cartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice})),
-            total:snkTot, paymentMethod:'simulated', simPaymentId,
-          });
-          upCoins(rr.data.newCoinBalance??coins, rr.data.wallet??wallet);
-        }catch(e){console.warn('Snack warn:', e.message);}
-      }
-      setSel([]);setCart({});setPayM('simulated');
-    };
+  /* ── BOOK TICKET ───────────────────────────────────────────*/
+  const doBook=async(simPaymentId,method)=>{
+    const r=await axios.post(`${API}/book`,{
+      userUUID, username:user, movieName:movie.title, timing:selShow.time,
+      screenName:selShow.screenName||'', rows:selShow.rows||8, seatsPerRow:selShow.seatsPerRow||10,
+      selectedSeats:sel, amount:method==='coins'?0:tickTot,
+      coinsUsed:method==='coins'?coinsNeed:0,
+      paymentMethod:method, simPaymentId:simPaymentId||null,
+      isUpcoming:movie.isUpcoming||false,
+      seatCategories:movie.seatCategories||[],
+    });
+    setETicket({qr:r.data.eTicketQR||null,movieName:movie.title,timing:selShow.time,screenName:selShow.screenName||'',seats:sel,amount:method==='coins'?0:tickTot,ticketId:r.data.ticketId,simPaymentId,isUpcoming:movie.isUpcoming||false});
+    upCoins(r.data.newCoinBalance??coins,r.data.wallet??wallet);
+    showToast(`✅ Booked!${(r.data.coinsEarned||0)>0?` +${r.data.coinsEarned} 🪙`:''}`);
+    // Order snacks if any
+    if(cartItems.length>0&&method!=='coins'){
+      try{
+        const rr=await axios.post(`${API}/refreshments/order`,{
+          userUUID,username:user,movieName:movie.title,timing:selShow.time,
+          items:cartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice})),
+          total:snkTot,paymentMethod:'simulated',simPaymentId,
+        });
+        upCoins(rr.data.newCoinBalance??coins,rr.data.wallet??wallet);
+      }catch(e){console.warn('Snack warn:',e.message);}
+    }
+    setSel([]);setCart({});setPayM('simulated');
+  };
 
+  const confirmBook=async(method='simulated')=>{
     if(method==='simulated'){
       setPayProcessing(true);
-      try{
-        const result=await simulatePayment(tickTot+snkTot);
-        setPayProcessing(false);
-        await doBook(result.simPaymentId);
-      }catch(e){
-        setPayProcessing(false);
-        showToast('❌ '+(e.response?.data?.error||'Booking failed'));
-      }
     }else{
-      // coins method — no spinner needed
-      try{await doBook(null);}
+      try{await doBook(null,method);}
       catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
     }
   };
 
-  /* ── CANCEL TICKET ───────────────────────────────────────────────────────*/
+  /* ── CANCEL TICKET ─────────────────────────────────────────*/
   const cancelTicket=async(ticketId)=>{
     if(!window.confirm('Cancel this booking? Paid amount will be refunded to your CineWallet.'))return;
     setCancelLoading(ticketId);
     try{
       const r=await axios.post(`${API}/cancel-ticket/${ticketId}`,{userUUID});
-      upCoins(r.data.newCoinBalance??coins, r.data.wallet??wallet);
+      upCoins(r.data.newCoinBalance??coins,r.data.wallet??wallet);
       let msg='✅ Cancelled!';
-      if(r.data.refundAmount>0) msg+=` ₹${r.data.refundAmount} → CineWallet`;
-      else if(r.data.refundCoins>0) msg+=` +${r.data.refundCoins} 🪙 refunded`;
+      if(r.data.refundAmount>0)msg+=` ₹${r.data.refundAmount} → CineWallet`;
+      else if(r.data.refundCoins>0)msg+=` +${r.data.refundCoins} 🪙 refunded`;
       showToast(msg);
       loadHist();
     }catch(e){showToast('❌ '+(e.response?.data?.error||'Cancellation failed'));}
@@ -1334,6 +1374,15 @@ function UserApp({onAdmin}){
   const cartQty=cartItems.reduce((s,i)=>s+i.qty,0);
   const currentMovies=movies.filter(m=>!m.isUpcoming);
   const upcomingMovies=movies.filter(m=>m.isUpcoming);
+  const hasZonePricing=!!(movie?.seatCategories?.length);
+
+  /* ── PAYMENT COMPLETE HANDLER ──────────────────────────────*/
+  const onPayComplete=async()=>{
+    setPayProcessing(false);
+    const simId=`SIM_PAY_${Date.now()}_${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    try{await doBook(simId,'simulated');}
+    catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
+  };
 
   const NavBar=()=>(
     <nav className="nav">
@@ -1374,7 +1423,7 @@ function UserApp({onAdmin}){
           <div className="auth-brand">Cine Time</div>
           <div className="auth-tag">Your Ultimate Movie Experience</div>
           <div className="auth-feats">
-            {[['🎟','Book Tickets Online'],['🍿','Order Refreshments'],['💳','Instant Simulated Payment'],['🪙','Earn & Redeem CineCoins'],['❌','Easy Cancellations & Refunds']].map(([ico,txt])=>(
+            {[['🎟','Book Tickets Online'],['🍿','Order Refreshments'],['💳','Instant Simulated Payment'],['🪙','Earn & Redeem CineCoins'],['❌','Easy Cancellations & Refunds'],['🪑','Zone-Based Seat Pricing']].map(([ico,txt])=>(
               <div key={txt} className="auth-feat"><div className="auth-feat-ico">{ico}</div>{txt}</div>
             ))}
           </div>
@@ -1410,7 +1459,7 @@ function UserApp({onAdmin}){
   /* GALLERY */
   if(page==='gallery')return(
     <><style>{G}</style><Toast msg={toast}/>
-      {payProcessing&&<PaymentOverlay amount={tickTot+snkTot} onComplete={()=>{}}/>}
+      {payProcessing&&<PaymentOverlay amount={tickTot+snkTot} onComplete={onPayComplete}/>}
       <ETicket data={eTicket} onClose={()=>{setETicket(null);setPage('gallery');}} email={email}/>
       <NavBar/>
       <div className="shell page">
@@ -1471,16 +1520,29 @@ function UserApp({onAdmin}){
             <div style={{fontSize:21,fontWeight:900,marginBottom:3}}>{movie.title}</div>
             {isUpcoming&&<div style={{background:'rgba(255,184,0,.12)',border:'1px solid rgba(255,184,0,.3)',borderRadius:10,padding:'7px 13px',marginBottom:10,fontSize:12,fontWeight:700,color:'#B8860B'}}>📅 Upcoming Movie — Pre-Book your seat now!</div>}
             <div style={{fontSize:12,color:'var(--t3)',marginBottom:5}}>⭐ {movie.rating||'TBD'} · {movie.language} · {movie.duration}</div>
-            {movie.description&&<div style={{fontSize:12,color:'var(--t3)',marginBottom:16,lineHeight:1.6}}>{movie.description}</div>}
+            {movie.description&&<div style={{fontSize:12,color:'var(--t3)',marginBottom:12,lineHeight:1.6}}>{movie.description}</div>}
+            {/* Zone pricing legend */}
+            {movie.seatCategories?.length>0&&(
+              <div style={{background:'var(--card2)',borderRadius:12,padding:'12px 14px',marginBottom:16,border:'1px solid var(--bdr)'}}>
+                <div style={{fontSize:10,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>🪑 Seat Zone Pricing</div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
+                  {movie.seatCategories.map((c,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:c.color+'18',borderRadius:8,padding:'4px 10px',border:`1px solid ${c.color}33`}}>
+                      <div style={{width:8,height:8,borderRadius:2,background:c.color,flexShrink:0}}/>
+                      <span style={{fontSize:11,fontWeight:700,color:c.color}}>{c.name}</span>
+                      <span style={{fontSize:11,color:'var(--t2)',fontWeight:800}}>₹{c.price}</span>
+                      <span style={{fontSize:9,color:'var(--t3)'}}>R{c.fromRow}–{c.toRow}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {isUpcoming&&shows.length===0?(
               <div style={{textAlign:'center',padding:'24px 0'}}>
                 <div style={{fontSize:36,marginBottom:10}}>⏰</div>
                 <div style={{fontWeight:800,fontSize:15,marginBottom:6}}>Showtimes Not Announced Yet</div>
                 <div style={{fontSize:12,color:'var(--t3)',marginBottom:18}}>Pre-book a seat and we'll confirm once shows go live.</div>
-                <button className="btn btn-red" onClick={()=>{
-                  const fakeShow={time:'TBD — Upcoming',screenName:'',screenId:'',rows:8,seatsPerRow:10,capacity:80};
-                  setSelShow(fakeShow);setPage('seats');
-                }}>📅 Pre-Book a Seat →</button>
+                <button className="btn btn-red" onClick={()=>{const fakeShow={time:'TBD — Upcoming',screenName:'',screenId:'',rows:8,seatsPerRow:10,capacity:80};setSelShow(fakeShow);setPage('seats');}}>📅 Pre-Book a Seat →</button>
               </div>
             ):(
               <>
@@ -1496,7 +1558,7 @@ function UserApp({onAdmin}){
                         {s.screenName&&<div style={{fontSize:10,color:'var(--t3)',marginTop:3}}>🖥️ {s.screenName} · {s.rows||8}×{s.seatsPerRow||10}={s.capacity||80} seats</div>}
                       </div>
                       <div style={{display:'flex',gap:7,alignItems:'center'}}>
-                        <span style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>₹{price}</span>
+                        <span style={{fontSize:12,fontWeight:700,color:'var(--green)'}}>{movie.seatCategories?.length?'Zone pricing':'₹'+price}</span>
                         <span className="avail-ok">{isUpcoming?'Pre-Book':'Avail'}</span>
                       </div>
                     </button>
@@ -1515,6 +1577,7 @@ function UserApp({onAdmin}){
     const cols=Math.min(spr,12);
     const sz=Math.max(30,Math.min(44,Math.floor(360/cols)));
     const isUpcoming=movie.isUpcoming||false;
+    const cats=movie.seatCategories||[];
     return(
       <><style>{G}</style><Toast msg={toast}/>
         <nav className="nav">
@@ -1528,12 +1591,22 @@ function UserApp({onAdmin}){
             <div style={{fontSize:12,color:'var(--t3)',marginTop:3,display:'flex',alignItems:'center',justifyContent:'center',gap:7,flexWrap:'wrap'}}>
               <span>🕐 {selShow?.time}</span>
               {selShow?.screenName&&<><span style={{width:3,height:3,background:'var(--t4)',borderRadius:'50%',display:'inline-block'}}/><span>🖥️ {selShow.screenName}</span></>}
-              <span style={{width:3,height:3,background:'var(--t4)',borderRadius:'50%',display:'inline-block'}}/>
-              <span style={{color:'var(--green)',fontWeight:700}}>₹{getPrice()}/seat</span>
             </div>
-            {isUpcoming&&<div style={{marginTop:8,background:'rgba(255,184,0,.1)',borderRadius:10,padding:'5px 14px',display:'inline-block',fontSize:11,fontWeight:700,color:'#B8860B'}}>📅 Pre-booking — shows on upcoming list</div>}
+            {isUpcoming&&<div style={{marginTop:8,background:'rgba(255,184,0,.1)',borderRadius:10,padding:'5px 14px',display:'inline-block',fontSize:11,fontWeight:700,color:'#B8860B'}}>📅 Pre-booking</div>}
           </div>
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:18}}>
+          {/* Zone legend */}
+          {cats.length>0&&(
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center',marginBottom:12}}>
+              {cats.map((c,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:5,background:c.color+'15',borderRadius:8,padding:'4px 10px',border:`1px solid ${c.color}33`}}>
+                  <div style={{width:9,height:9,borderRadius:2,background:c.color}}/>
+                  <span style={{fontSize:10,fontWeight:700,color:c.color}}>{c.name}</span>
+                  <span style={{fontSize:10,color:'var(--t2)',fontWeight:800}}>₹{c.price}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:14}}>
             <div style={{width:'75%',maxWidth:300,height:5,borderRadius:'0 0 50% 50% / 0 0 6px 6px',background:'linear-gradient(90deg,transparent 5%,var(--accent) 35%,var(--accent2) 65%,transparent 95%)',opacity:.85}}/>
             <div style={{marginTop:5,fontSize:9,fontWeight:800,color:'var(--t3)',textTransform:'uppercase',letterSpacing:3}}>{selShow?.screenName||'SCREEN'} — {cap} SEATS</div>
           </div>
@@ -1541,7 +1614,20 @@ function UserApp({onAdmin}){
             <div style={{display:'grid',gridTemplateColumns:`repeat(${cols},${sz}px)`,gap:4,justifyContent:'center'}}>
               {[...Array(cap)].map((_,i)=>{
                 const tk=booked.includes(i);const sl=sel.includes(i);
-                return<div key={i} className={`seat-btn ${tk?'s-booked':sl?'s-sel':'s-avail'}`} style={{width:sz,height:sz,fontSize:Math.max(7,11-Math.floor(cap/60))}} onClick={()=>!tk&&setSel(p=>p.includes(i)?p.filter(s=>s!==i):[...p,i])}>{i+1}</div>;
+                const rowNum=Math.floor(i/spr);
+                const zone=cats.length>0?getSeatCat(i,spr,cats):null;
+                // Color the available seat by zone
+                let seatStyle={};
+                if(!tk&&!sl&&zone){seatStyle={background:zone.color+'22',borderColor:zone.color+'44',color:zone.color};}
+                return(
+                  <div key={i}
+                    className={`seat-btn ${tk?'s-booked':sl?'s-sel':'s-avail'}`}
+                    style={{width:sz,height:sz,fontSize:Math.max(7,11-Math.floor(cap/60)),...(!tk&&!sl?seatStyle:{})}}
+                    title={zone?`${zone.name} · ₹${zone.price}`:`Seat ${i+1}`}
+                    onClick={()=>!tk&&setSel(p=>p.includes(i)?p.filter(s=>s!==i):[...p,i])}>
+                    {i+1}
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -1552,7 +1638,11 @@ function UserApp({onAdmin}){
           </div>
           <div className="sum-bar">
             <div><div className="sum-lbl">Seats</div><div style={{fontSize:12,fontWeight:700,maxWidth:200,wordBreak:'break-word'}}>{sel.length>0?sel.map(s=>s+1).join(', '):'—'}</div></div>
-            <div style={{textAlign:'right'}}><div className="sum-lbl">Total</div><div className="sum-val">₹{tickTot}</div></div>
+            <div style={{textAlign:'right'}}>
+              <div className="sum-lbl">Total</div>
+              <div className="sum-val">₹{tickTot}</div>
+              {hasZonePricing&&sel.length>0&&<div style={{fontSize:10,color:'var(--t3)'}}>Zone pricing applied</div>}
+            </div>
           </div>
           <div style={{display:'flex',gap:10,width:'100%',maxWidth:460}}>
             <button className="btn btn-grey" style={{flex:1}} onClick={()=>setPage('timings')}>Cancel</button>
@@ -1569,26 +1659,7 @@ function UserApp({onAdmin}){
     return(
       <><style>{G}</style><Toast msg={toast}/>
         <ETicket data={eTicket} onClose={()=>{setETicket(null);setPage('gallery');}} email={email}/>
-        {payProcessing&&<PaymentOverlay amount={tickTot+snkTot} onComplete={async()=>{
-          setPayProcessing(false);
-          const simId=`SIM_PAY_${Date.now()}_${Math.random().toString(36).slice(2,8).toUpperCase()}`;
-          try{
-            const r=await axios.post(`${API}/book`,{
-              userUUID, username:user, movieName:movie.title, timing:selShow.time,
-              screenName:selShow.screenName||'', rows:selShow.rows||8, seatsPerRow:selShow.seatsPerRow||10,
-              selectedSeats:sel, amount:tickTot,
-              coinsUsed:0, paymentMethod:'simulated', simPaymentId:simId,
-              isUpcoming:movie.isUpcoming||false,
-            });
-            setETicket({qr:r.data.eTicketQR||null,movieName:movie.title,timing:selShow.time,screenName:selShow.screenName||'',seats:sel,amount:tickTot,ticketId:r.data.ticketId,simPaymentId:simId,isUpcoming:movie.isUpcoming||false});
-            upCoins(r.data.newCoinBalance??0,r.data.wallet??wallet);
-            showToast(`✅ Booked! +${r.data.coinsEarned||0} 🪙`);
-            if(cartItems.length>0){
-              try{const rr=await axios.post(`${API}/refreshments/order`,{userUUID,username:user,movieName:movie.title,timing:selShow.time,items:cartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice})),total:snkTot,paymentMethod:'simulated',simPaymentId:simId});upCoins(rr.data.newCoinBalance??coins,rr.data.wallet??wallet);}catch{}
-            }
-            setSel([]);setCart({});setPayM('simulated');
-          }catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
-        }}/>}
+        {payProcessing&&<PaymentOverlay amount={tickTot+snkTot} onComplete={onPayComplete}/>}
         <div className="pay-wrap">
           <div className="pay-card pop">
             <div style={{width:72,height:72,borderRadius:22,background:payM==='coins'?'linear-gradient(145deg,#FFB800,#FF9500)':'linear-gradient(145deg,#2d6adb,#1a4fb5)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:36,margin:'0 auto 20px'}}>
@@ -1607,22 +1678,36 @@ function UserApp({onAdmin}){
               </div>
             </div>
             <div className="pay-tbl">
-              <div className="pay-row"><span className="pay-lbl">Tickets ({sel.length}×₹{getPrice()})</span><span className="pay-val">₹{tickTot}</span></div>
+              {/* Per-seat zone breakdown */}
+              {hasZonePricing&&sel.length>0?(
+                sel.map(s=>{
+                  const zone=getSeatCat(s,spr,movie.seatCategories||[]);
+                  return(
+                    <div key={s} className="pay-row">
+                      <span className="pay-lbl">Seat {s+1}{zone?` · ${zone.name}`:''}</span>
+                      <span className="pay-val">₹{getSeatPrice(s)}</span>
+                    </div>
+                  );
+                })
+              ):(
+                <div className="pay-row"><span className="pay-lbl">Tickets ({sel.length}×₹{getBasePrice()||tickTot/Math.max(sel.length,1)})</span><span className="pay-val">₹{tickTot}</span></div>
+              )}
               {snkTot>0&&<div className="pay-row"><span className="pay-lbl">Refreshments</span><span className="pay-val">₹{snkTot}</span></div>}
+              {wallet>0&&<div className="pay-row"><span className="pay-lbl" style={{color:'var(--green)'}}>💰 CineWallet</span><span style={{color:'var(--green)',fontWeight:700}}>₹{wallet} available</span></div>}
               <div className="pay-row pay-total"><span className="pay-lbl">Total</span><span className="pay-val">{payM==='coins'?`${coinsNeed} 🪙`:`₹${tickTot+snkTot}`}</span></div>
             </div>
             {payM==='simulated'&&(
-              <div style={{background:'linear-gradient(135deg,#EEF2FF,#E0E7FF)',borderRadius:13,padding:'16px 18px',marginBottom:14,border:'1px solid rgba(45,106,219,.2)'}}>
-                <div style={{fontSize:24,marginBottom:6}}>🏦</div>
-                <div style={{fontWeight:800,fontSize:15,color:'#1a4fb5',marginBottom:4}}>CinePay — Simulated Gateway</div>
-                <div style={{fontSize:12,color:'#6C6C70',lineHeight:1.6}}>Payment will be processed instantly. No real money charged. You'll receive your e-ticket QR immediately.</div>
-                <div style={{marginTop:8,fontSize:11,color:'#1a4fb5',fontWeight:700}}>🔒 Secure Simulation · Instant Confirmation</div>
-              </div>
-            )}
-            {payM==='simulated'&&(
-              <button className="btn btn-sim" onClick={()=>setPayProcessing(true)} disabled={payProcessing||sel.length===0}>
-                {payProcessing?<><SpinDark/><span style={{marginLeft:8}}>Processing…</span></>:`🏦 Pay ₹${tickTot+snkTot} with CinePay`}
-              </button>
+              <>
+                <div style={{background:'linear-gradient(135deg,#EEF2FF,#E0E7FF)',borderRadius:13,padding:'16px 18px',marginBottom:14,border:'1px solid rgba(45,106,219,.2)'}}>
+                  <div style={{fontSize:24,marginBottom:6}}>🏦</div>
+                  <div style={{fontWeight:800,fontSize:15,color:'#1a4fb5',marginBottom:4}}>CinePay — Simulated Gateway</div>
+                  <div style={{fontSize:12,color:'#6C6C70',lineHeight:1.6}}>Payment will be processed instantly. No real money charged. You'll receive your e-ticket QR immediately.</div>
+                  <div style={{marginTop:8,fontSize:11,color:'#1a4fb5',fontWeight:700}}>🔒 Secure Simulation · Instant Confirmation</div>
+                </div>
+                <button className="btn btn-sim" onClick={()=>confirmBook('simulated')} disabled={payProcessing||sel.length===0}>
+                  {payProcessing?<><SpinDark/><span style={{marginLeft:8}}>Processing…</span></>:`🏦 Pay ₹${tickTot+snkTot} with CinePay`}
+                </button>
+              </>
             )}
             {payM==='coins'&&(
               <div>
@@ -1696,82 +1781,124 @@ function UserApp({onAdmin}){
       <MobNav/><Chatbot movies={movies}/></>
   );
 
-  /* HISTORY */
+  /* HISTORY — Tickets and Snacks SEPARATELY */
   if(page==='history')return(
     <><style>{G}</style><Toast msg={toast}/>
       <NavBar/>
       <ETicket data={eTicket} onClose={()=>setETicket(null)} email={email}/>
       <div className="shell page" style={{paddingBottom:80}}>
         <div style={{fontSize:26,fontWeight:900,marginBottom:16}}>My Bookings 🎟️</div>
-        {wallet>0&&<div style={{background:'linear-gradient(135deg,rgba(52,199,89,.1),rgba(52,199,89,.05))',border:'1px solid rgba(52,199,89,.3)',borderRadius:'var(--r2)',padding:'14px 18px',marginBottom:18,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div><div style={{fontWeight:800,fontSize:15,color:'var(--green)'}}>💰 CineWallet</div><div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>Refunded amounts — usable for future bookings</div></div>
-          <div style={{fontSize:22,fontWeight:900,color:'var(--green)'}}>₹{wallet}</div>
-        </div>}
+        {/* CineWallet balance */}
+        {wallet>0&&(
+          <div style={{background:'linear-gradient(135deg,rgba(52,199,89,.12),rgba(52,199,89,.05))',border:'1px solid rgba(52,199,89,.3)',borderRadius:'var(--r2)',padding:'14px 18px',marginBottom:18,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <div style={{fontWeight:800,fontSize:15,color:'var(--green)'}}>💰 CineWallet</div>
+              <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>Refunded balance — usable on next ticket payment</div>
+            </div>
+            <div style={{fontSize:22,fontWeight:900,color:'var(--green)'}}>₹{wallet}</div>
+          </div>
+        )}
+        {/* Tab switcher */}
         <div style={{display:'flex',gap:8,marginBottom:18,overflowX:'auto'}}>
-          {[['tickets','🎟 Tickets'],['refreshments','🍿 Snacks']].map(([k,l])=>(
+          {[['tickets','🎟 Movie Tickets'],['snacks','🍿 Snack Orders'],['admin','🌟 Managed Bookings']].map(([k,l])=>(
             <button key={k} onClick={()=>setHistTab(k)} style={{padding:'7px 16px',borderRadius:20,border:'none',cursor:'pointer',fontFamily:"'Figtree',sans-serif",fontWeight:700,fontSize:13,background:histTab===k?'var(--accent)':'var(--card)',color:histTab===k?'#fff':'var(--t3)',boxShadow:histTab===k?'0 4px 12px rgba(255,55,95,.3)':'var(--sh1)',whiteSpace:'nowrap'}}>{l}</button>
           ))}
         </div>
+
+        {/* TICKET TAB */}
         {histTab==='tickets'&&(
-          (!hist.tickets?.length&&!hist.adminBookings?.length)
-            ?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>🎬</div>No bookings yet!</div>
-            :<>
-              {hist.tickets?.map((h,i)=>(
-                <div key={i} className={`hist-card ${h.status==='cancelled'?'cancelled':''}`}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <div style={{flex:1}}>
-                      <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:4,flexWrap:'wrap'}}>
-                        <div style={{fontSize:15,fontWeight:800}}>{h.movieName}</div>
-                        {h.isUpcoming&&<span style={{background:'rgba(255,184,0,.15)',color:'#B8860B',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>📅 Upcoming</span>}
-                        {h.status==='cancelled'&&<span style={{background:'rgba(255,55,95,.1)',color:'var(--accent)',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>❌ Cancelled</span>}
+          !hist.tickets?.length
+            ?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>🎬</div><div style={{fontWeight:700}}>No ticket bookings yet!</div><div style={{fontSize:13,marginTop:6}}>Book your first movie above.</div></div>
+            :hist.tickets.map((h,i)=>(
+              <div key={i} className={`hist-card ${h.status==='cancelled'?'cancelled':''}`}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:4,flexWrap:'wrap'}}>
+                      <div style={{fontSize:15,fontWeight:800}}>{h.movieName}</div>
+                      {h.isUpcoming&&<span style={{background:'rgba(255,184,0,.15)',color:'#B8860B',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>📅 Upcoming</span>}
+                      {h.status==='cancelled'
+                        ?<span style={{background:'rgba(255,55,95,.1)',color:'var(--accent)',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>❌ Cancelled</span>
+                        :<span style={{background:'rgba(52,199,89,.1)',color:'var(--green)',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>✅ Confirmed</span>}
+                    </div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>🕐 {h.timing}{h.screenName?` · 🖥️ ${h.screenName}`:''}</div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>🪑 Seats: {h.selectedSeats?.map(s=>s+1).join(', ')}</div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{h.paymentMethod==='coins'?`🪙 ${h.coinsUsed} CineCoins`:`₹${h.amount}`}</div>
+                    {/* Zone breakdown if available */}
+                    {h.seatDetails?.length>0&&h.status!=='cancelled'&&(
+                      <div style={{display:'flex',gap:5,marginTop:5,flexWrap:'wrap'}}>
+                        {h.seatDetails.map((d,di)=>(
+                          <span key={di} style={{background:'var(--card2)',borderRadius:6,padding:'2px 7px',fontSize:10,color:'var(--t2)',fontWeight:600}}>#{d.seat+1} {d.category} ₹{d.price}</span>
+                        ))}
                       </div>
-                      <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>🕐 {h.timing}{h.screenName?` · 🖥️ ${h.screenName}`:''}</div>
-                      <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>Seats: {h.selectedSeats?.map(s=>s+1).join(', ')}</div>
-                      <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{h.paymentMethod==='coins'?`🪙 ${h.coinsUsed}`:`₹${h.amount}`} · {h.status}</div>
-                      {h.coinsEarned>0&&h.status!=='cancelled'&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{h.coinsEarned} earned</div>}
-                      {h.status==='cancelled'&&h.refundAmount>0&&<div style={{fontSize:11,color:'var(--green)',fontWeight:700,marginTop:5}}>💰 ₹{h.refundAmount} → CineWallet</div>}
-                      {h.status==='cancelled'&&h.paymentMethod==='coins'&&h.coinsUsed>0&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{h.coinsUsed} refunded</div>}
-                    </div>
-                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:7}}>
-                      <div className={h.status==='cancelled'?'hist-badge':h.isUpcoming?'upcoming-badge':'hist-badge-green'}>{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
-                      {h.eTicketQR&&h.status!=='cancelled'&&<div style={{cursor:'pointer'}} onClick={()=>setETicket({qr:h.eTicketQR,movieName:h.movieName,timing:h.timing,screenName:h.screenName,seats:h.selectedSeats,amount:h.amount,isUpcoming:h.isUpcoming})}>
-                        <img src={h.eTicketQR} alt="QR" style={{width:52,borderRadius:8,border:'2px solid var(--accent-bg)'}}/>
+                    )}
+                    {h.coinsEarned>0&&h.status!=='cancelled'&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{h.coinsEarned} CineCoins earned</div>}
+                    {h.status==='cancelled'&&h.refundAmount>0&&<div style={{fontSize:11,color:'var(--green)',fontWeight:700,marginTop:5}}>💰 ₹{h.refundAmount} refunded to CineWallet</div>}
+                    {h.status==='cancelled'&&h.paymentMethod==='coins'&&h.coinsUsed>0&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{h.coinsUsed} CineCoins refunded</div>}
+                    <div style={{fontSize:10,color:'var(--t4)',marginTop:4}}>{new Date(h.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:7,marginLeft:12}}>
+                    {h.eTicketQR&&h.status!=='cancelled'&&(
+                      <div style={{cursor:'pointer'}} onClick={()=>setETicket({qr:h.eTicketQR,movieName:h.movieName,timing:h.timing,screenName:h.screenName,seats:h.selectedSeats,amount:h.amount,isUpcoming:h.isUpcoming})}>
+                        <img src={h.eTicketQR} alt="QR" style={{width:56,borderRadius:9,border:'2px solid var(--accent-bg)'}}/>
                         <div style={{fontSize:9,color:'var(--accent)',fontWeight:700,textAlign:'center',marginTop:2}}>Tap QR</div>
-                      </div>}
-                      {h.status==='confirmed'&&(
-                        <button className="btn-cancel" disabled={!!cancelLoading} onClick={()=>cancelTicket(h._id)}>
-                          {cancelLoading===h._id?<SpinDark/>:'❌ Cancel'}
-                        </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                    {h.status==='confirmed'&&(
+                      <button className="btn-cancel" disabled={!!cancelLoading} onClick={()=>cancelTicket(h._id)}>
+                        {cancelLoading===h._id?<SpinDark/>:'❌ Cancel'}
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
-              {hist.adminBookings?.map((h,i)=>(
-                <div key={`a${i}`} className="hist-card" style={{border:'1px solid rgba(255,184,0,.2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:15,fontWeight:800,color:'#B8860B'}}>{h.movieName} <span style={{fontSize:10,background:'rgba(255,184,0,.15)',color:'#B8860B',borderRadius:5,padding:'2px 6px'}}>Admin Booking</span></div>
-                      <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>🕐 {h.timing}{h.screenName?` · 🖥️ ${h.screenName}`:''}</div>
-                      <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>Seats: {h.selectedSeats?.map(s=>s+1).join(', ')}</div>
-                    </div>
-                    <div className="hist-badge">{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
-                  </div>
-                </div>
-              ))}
-            </>
+              </div>
+            ))
         )}
-        {histTab==='refreshments'&&(
+
+        {/* SNACKS TAB */}
+        {histTab==='snacks'&&(
           !hist.refreshments?.length
-            ?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>🍿</div>No snack orders!</div>
+            ?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>🍿</div><div style={{fontWeight:700}}>No snack orders yet!</div><div style={{fontSize:13,marginTop:6}}>Head to the Snack Bar.</div></div>
             :hist.refreshments.map((r,i)=>(
               <div key={i} className="hist-card">
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <div><div style={{fontSize:14,fontWeight:800}}>🍿 Snack Order</div>
-                  <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>{r.items?.map(x=>`${x.name} ×${x.qty}`).join(', ')}</div>
-                  <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{r.paymentMethod==='coins'?`🪙 ${r.coinsUsed}`:`₹${r.total}`}</div>
-                  {r.coinsEarned>0&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{r.coinsEarned}</div>}</div>
-                  <div className="hist-badge-green">{new Date(r.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:4}}>
+                      <div style={{fontSize:15,fontWeight:800}}>🍿 Snack Order</div>
+                      <span style={{background:'rgba(255,149,0,.12)',color:'#FF9500',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>✅ Placed</span>
+                    </div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{r.items?.map(x=>`${x.name} ×${x.qty}`).join(', ')}</div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>{r.paymentMethod==='coins'?`🪙 ${r.coinsUsed} CineCoins`:`₹${r.total}`}</div>
+                    {r.coinsEarned>0&&<div style={{fontSize:11,color:'#B8860B',fontWeight:700,marginTop:5}}>🪙 +{r.coinsEarned} CineCoins earned</div>}
+                    <div style={{fontSize:10,color:'var(--t4)',marginTop:4}}>{new Date(r.date).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</div>
+                  </div>
+                  <div style={{background:'rgba(255,149,0,.1)',color:'#FF9500',borderRadius:10,padding:'6px 12px',fontWeight:900,fontSize:14}}>₹{r.total}</div>
+                </div>
+              </div>
+            ))
+        )}
+
+        {/* ADMIN BOOKINGS TAB */}
+        {histTab==='admin'&&(
+          !hist.adminBookings?.length
+            ?<div style={{textAlign:'center',padding:'50px 20px',color:'var(--t3)'}}><div style={{fontSize:48,marginBottom:12}}>🌟</div><div style={{fontWeight:700}}>No managed bookings.</div></div>
+            :hist.adminBookings.map((h,i)=>(
+              <div key={`a${i}`} className="hist-card" style={{border:'1px solid rgba(255,184,0,.25)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:4}}>
+                      <div style={{fontSize:15,fontWeight:800,color:'#B8860B'}}>{h.movieName}</div>
+                      <span style={{background:'rgba(255,184,0,.15)',color:'#B8860B',borderRadius:6,padding:'1px 7px',fontSize:10,fontWeight:700}}>🌟 Managed</span>
+                    </div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>🕐 {h.timing}{h.screenName?` · 🖥️ ${h.screenName}`:''}</div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>🪑 Seats: {h.selectedSeats?.map(s=>s+1).join(', ')}</div>
+                    <div style={{fontSize:10,color:'var(--t4)',marginTop:4}}>{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+                  </div>
+                  {h.eTicketQR&&(
+                    <div style={{cursor:'pointer'}} onClick={()=>setETicket({qr:h.eTicketQR,movieName:h.movieName,timing:h.timing,screenName:h.screenName,seats:h.selectedSeats,amount:h.amount||0,isUpcoming:h.isUpcoming||false})}>
+                      <img src={h.eTicketQR} alt="QR" style={{width:56,borderRadius:9,border:'2px solid rgba(255,184,0,.3)'}}/>
+                      <div style={{fontSize:9,color:'#B8860B',fontWeight:700,textAlign:'center',marginTop:2}}>Tap QR</div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -1789,14 +1916,19 @@ function UserApp({onAdmin}){
           <div style={{fontSize:12,fontWeight:700,letterSpacing:1,opacity:.85,textTransform:'uppercase',marginBottom:7}}>Your Balance</div>
           <div key={coinKey} className="coins-bal coin-anim">{coins} 🪙</div>
           <div style={{opacity:.85,marginTop:7,fontSize:13}}>500 coins = 1 free ticket · Earn on every CinePay purchase!</div>
-          {wallet>0&&<div style={{marginTop:12,background:'rgba(52,199,89,.2)',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div style={{fontSize:13,fontWeight:700}}>💰 CineWallet (Refunds)</div>
-            <div style={{fontSize:20,fontWeight:900}}>₹{wallet}</div>
-          </div>}
+          {wallet>0&&(
+            <div style={{marginTop:12,background:'rgba(52,199,89,.2)',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700}}>💰 CineWallet (Refunds)</div>
+                <div style={{fontSize:11,opacity:.8}}>Use for future ticket bookings</div>
+              </div>
+              <div style={{fontSize:20,fontWeight:900}}>₹{wallet}</div>
+            </div>
+          )}
           <button onClick={()=>refreshCoins(userUUID)} style={{marginTop:12,background:'rgba(255,255,255,.2)',border:'none',borderRadius:10,padding:'7px 16px',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>🔄 Refresh</button>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:11,marginBottom:22}}>
-          {[['🎟','Tickets','10/ticket'],['🍿','Snacks','5/order'],['💳','Redeem','500=free ticket'],['💰','Wallet','Refunds stored']].map(([ico,n,d])=>(
+          {[['🎟','Tickets','10 coins/ticket'],['🍿','Snacks','5 coins/order'],['💳','Redeem','500 = free ticket'],['💰','Wallet','Refunds stored']].map(([ico,n,d])=>(
             <div key={n} style={{background:'var(--card)',borderRadius:'var(--r2)',padding:14,boxShadow:'var(--sh1)',border:'1px solid var(--bdr)',textAlign:'center'}}>
               <div style={{fontSize:24}}>{ico}</div><div style={{fontWeight:800,fontSize:13,marginTop:5}}>{n}</div><div style={{fontSize:10,color:'var(--t3)',marginTop:2}}>{d}</div>
             </div>
@@ -1804,15 +1936,15 @@ function UserApp({onAdmin}){
         </div>
         <div style={{fontWeight:800,fontSize:17,marginBottom:12}}>Transaction History</div>
         {coinHist.length===0
-          ?<div style={{textAlign:'center',padding:36,color:'var(--t3)'}}>No coin activity yet.</div>
+          ?<div style={{textAlign:'center',padding:36,color:'var(--t3)'}}>No coin activity yet. Book a ticket!</div>
           :<div className="coins-tbl">{coinHist.map((c,i)=>(
             <div key={i} className="coins-row">
               <div>
                 <div style={{fontWeight:600,fontSize:13}}>{c.text}</div>
-                <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{new Date(c.date).toLocaleDateString('en-IN')}</div>
+                <div style={{fontSize:11,color:'var(--t3)',marginTop:1}}>{new Date(c.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
               </div>
-              <div className={c.type==='earn'?'coins-pos':c.type==='refund'?'coins-pos':c.type==='use'?'coins-neg':'coins-neg'} style={{color:c.type==='refund'?'var(--green)':undefined}}>
-                {c.type==='earn'||c.type==='refund'?'+':''}{c.type==='refund'?`₹${c.amount}`:c.type==='earn'?`${c.amount} 🪙`:`${c.amount} 🪙`}
+              <div className={c.type==='use'?'coins-neg':'coins-pos'} style={{color:c.type==='refund'?'var(--green)':undefined}}>
+                {c.type==='use'?`${c.amount} 🪙`:c.type==='refund'?`+₹${c.amount}`:`+${c.amount} 🪙`}
               </div>
             </div>
           ))}</div>}

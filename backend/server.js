@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
   phone:     String,
   role:      { type: String, default: 'user' },
   cineCoins: { type: Number, default: 0 },
-  wallet:    { type: Number, default: 0 },  // refund wallet
+  wallet:    { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -41,13 +41,22 @@ const screenSchema = new mongoose.Schema({
   createdAt:   { type: Date, default: Date.now },
 });
 
+// Seat category zone: defines row ranges + price multiplier
+const seatCategorySchema = new mongoose.Schema({
+  name:        { type: String },  // 'Balcony', 'Upper', 'Middle', 'Lower'
+  fromRow:     { type: Number },  // 1-based row number start
+  toRow:       { type: Number },  // 1-based row number end
+  price:       { type: Number },  // fixed price for this zone
+  color:       { type: String, default: '#007AFF' },
+}, { _id: false });
+
 const movieSchema = new mongoose.Schema({
-  title:       { type: String, required: true },
-  genre:       String,
-  language:    { type: String, default: 'Tamil' },
-  duration:    String,
-  rating:      { type: Number, default: 8.0 },
-  isUpcoming:  { type: Boolean, default: false },
+  title:          { type: String, required: true },
+  genre:          String,
+  language:       { type: String, default: 'Tamil' },
+  duration:       String,
+  rating:         { type: Number, default: 8.0 },
+  isUpcoming:     { type: Boolean, default: false },
   shows: [{
     time:        String,
     screenId:    String,
@@ -64,6 +73,8 @@ const movieSchema = new mongoose.Schema({
     evening:   { type: Number, default: 180 },
     night:     { type: Number, default: 200 },
   },
+  // NEW: seat zone categories
+  seatCategories: [seatCategorySchema],
   img:         String,
   description: String,
   isActive:    { type: Boolean, default: true },
@@ -77,6 +88,7 @@ const pastMovieSchema = new mongoose.Schema({
   duration:       String,
   rating:         Number,
   pricing:        Object,
+  seatCategories: Array,
   img:            String,
   description:    String,
   totalTickets:   { type: Number, default: 0 },
@@ -105,6 +117,12 @@ const ticketSchema = new mongoose.Schema({
   rows:              { type: Number, default: 8 },
   seatsPerRow:       { type: Number, default: 10 },
   selectedSeats:     [Number],
+  // NEW: per-seat category breakdown
+  seatDetails: [{
+    seat:     Number,
+    category: String,
+    price:    Number,
+  }],
   amount:            { type: Number, default: 0 },
   coinsUsed:         { type: Number, default: 0 },
   coinsEarned:       { type: Number, default: 0 },
@@ -142,6 +160,7 @@ const adminBookingSchema = new mongoose.Schema({
   rows:          { type: Number, default: 8 },
   seatsPerRow:   { type: Number, default: 10 },
   selectedSeats: [Number],
+  seatDetails:   [{ seat: Number, category: String, price: Number }],
   amount:        { type: Number, default: 0 },
   notes:         String,
   bookedBy:      { type: String, default: 'admin' },
@@ -161,16 +180,30 @@ const RefreshmentOrder = mongoose.model('RefreshmentOrder',  refreshmentOrderSch
 const AdminBooking     = mongoose.model('AdminBooking',      adminBookingSchema);
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-async function getCoins(uuid) {
-  const u = await User.findOne({ uuid });
-  return u?.cineCoins || 0;
-}
-async function getWallet(uuid) {
-  const u = await User.findOne({ uuid });
-  return u?.wallet || 0;
-}
 function simPayId() {
   return `SIM_PAY_${Date.now()}_${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+}
+
+// Given seatCategories array + rows, return category for a 0-based seat index
+function getSeatCategory(seatIndex, seatsPerRow, seatCategories) {
+  if (!seatCategories || !seatCategories.length) return null;
+  const rowNum = Math.floor(seatIndex / seatsPerRow) + 1; // 1-based
+  return seatCategories.find(c => rowNum >= c.fromRow && rowNum <= c.toRow) || null;
+}
+
+// Calculate total amount for selected seats using zone pricing
+function calcSeatAmount(selectedSeats, seatsPerRow, seatCategories, fallbackPrice) {
+  if (!seatCategories || !seatCategories.length) {
+    return { total: selectedSeats.length * fallbackPrice, details: [] };
+  }
+  let total = 0;
+  const details = selectedSeats.map(seat => {
+    const cat = getSeatCategory(seat, seatsPerRow, seatCategories);
+    const price = cat ? cat.price : fallbackPrice;
+    total += price;
+    return { seat, category: cat ? cat.name : 'Standard', price };
+  });
+  return { total, details };
 }
 
 // ── SEED ──────────────────────────────────────────────────────────────────────
@@ -189,34 +222,52 @@ async function seedDefaults() {
     if (!await Movie.countDocuments()) {
       const [s1,s2,s3] = [screens[0], screens[1]||screens[0], screens[2]||screens[0]];
       const mk = (t,s) => ({ time:t, screenId:s._id.toString(), screenName:s.name, screenType:s.screenType, rows:s.rows, seatsPerRow:s.seatsPerRow, capacity:s.capacity });
+      // Default seat categories for 8-row screen
+      const defaultCats8 = [
+        { name:'Balcony', fromRow:1, toRow:2, price:200, color:'#8B5CF6' },
+        { name:'Upper',   fromRow:3, toRow:4, price:170, color:'#007AFF' },
+        { name:'Middle',  fromRow:5, toRow:6, price:150, color:'#34C759' },
+        { name:'Lower',   fromRow:7, toRow:8, price:120, color:'#FF9500' },
+      ];
+      const defaultCats10 = [
+        { name:'Balcony', fromRow:1,  toRow:2,  price:250, color:'#8B5CF6' },
+        { name:'Upper',   fromRow:3,  toRow:5,  price:220, color:'#007AFF' },
+        { name:'Middle',  fromRow:6,  toRow:8,  price:180, color:'#34C759' },
+        { name:'Lower',   fromRow:9,  toRow:10, price:150, color:'#FF9500' },
+      ];
       await Movie.insertMany([
         { title:'Leo', genre:'Action/Thriller', language:'Tamil', duration:'2h 44m', rating:8.2,
           shows:[mk('10:00 AM',s1),mk('2:30 PM',s2),mk('6:00 PM',s1),mk('10:30 PM',s3)],
           timings:['10:00 AM','2:30 PM','6:00 PM','10:30 PM'],
           pricing:{morning:120,afternoon:150,evening:180,night:200},
+          seatCategories: defaultCats8,
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/3/3e/Leo_2023_film_poster.jpg/220px-Leo_2023_film_poster.jpg',
           description:'A mild-mannered man who runs a food business has his past catch up with him.' },
         { title:'Vikram', genre:'Action', language:'Tamil', duration:'2h 55m', rating:8.4,
           shows:[mk('10:15 AM',s2),mk('2:15 PM',s1),mk('6:15 PM',s3),mk('10:15 PM',s2)],
           timings:['10:15 AM','2:15 PM','6:15 PM','10:15 PM'],
           pricing:{morning:120,afternoon:150,evening:180,night:200},
+          seatCategories: defaultCats8,
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/5/5d/Vikram_2022_film_poster.jpg/220px-Vikram_2022_film_poster.jpg',
           description:'A special agent investigates a series of murders by masked men.' },
         { title:'Oppenheimer', genre:'Biography/Drama', language:'English', duration:'3h 0m', rating:8.9,
           shows:[mk('11:00 AM',s3),mk('3:00 PM',s1),mk('7:00 PM',s2)],
           timings:['11:00 AM','3:00 PM','7:00 PM'],
           pricing:{morning:130,afternoon:160,evening:190,night:210},
+          seatCategories: defaultCats10,
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Oppenheimer_%28film%29.jpg/220px-Oppenheimer_%28film%29.jpg',
           description:'The story of J. Robert Oppenheimer and the Manhattan Project.' },
         { title:'Jawan', genre:'Action/Drama', language:'Hindi', duration:'2h 49m', rating:7.5,
           shows:[mk('9:30 AM',s1),mk('1:00 PM',s3),mk('5:30 PM',s2),mk('9:30 PM',s1)],
           timings:['9:30 AM','1:00 PM','5:30 PM','9:30 PM'],
           pricing:{morning:120,afternoon:150,evening:180,night:200},
+          seatCategories: defaultCats8,
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7e/Jawan_film_poster.jpg/220px-Jawan_film_poster.jpg',
           description:'A prison warden recruits women to fight injustice.' },
         { title:'KGF Chapter 3', genre:'Action', language:'Kannada', duration:'2h 40m', rating:0, isUpcoming:true,
           shows:[], timings:[],
           pricing:{morning:150,afternoon:180,evening:210,night:250},
+          seatCategories: defaultCats8,
           img:'', description:'The saga of Rocky continues in an epic final chapter.' },
       ]);
       console.log('🎬 Movies seeded');
@@ -224,18 +275,18 @@ async function seedDefaults() {
 
     if (!await Snack.countDocuments()) {
       await Snack.insertMany([
-        { name:'Popcorn (Large)',      emoji:'🍿', price:180, coinPrice:90,  category:'Snacks' },
-        { name:'Popcorn (Medium)',     emoji:'🍿', price:120, coinPrice:60,  category:'Snacks' },
-        { name:'Nachos + Cheese',      emoji:'🌮', price:150, coinPrice:75,  category:'Snacks' },
-        { name:'Hot Dog',              emoji:'🌭', price:130, coinPrice:65,  category:'Snacks' },
-        { name:'Veg Burger',           emoji:'🍔', price:110, coinPrice:55,  category:'Snacks' },
-        { name:'Chocolate Bar',        emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks' },
-        { name:'Pepsi (Large)',        emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks' },
-        { name:'Pepsi (Medium)',       emoji:'🥤', price:60,  coinPrice:30,  category:'Drinks' },
-        { name:'Water Bottle',         emoji:'💧', price:40,  coinPrice:20,  category:'Drinks' },
-        { name:'Fresh Lime Soda',      emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks' },
-        { name:'Combo (Popcorn+Pepsi)',emoji:'🎉', price:230, coinPrice:115, category:'Combos' },
-        { name:'Family Pack',          emoji:'🎊', price:450, coinPrice:225, category:'Combos' },
+        { name:'Popcorn (Large)',       emoji:'🍿', price:180, coinPrice:90,  category:'Snacks' },
+        { name:'Popcorn (Medium)',      emoji:'🍿', price:120, coinPrice:60,  category:'Snacks' },
+        { name:'Nachos + Cheese',       emoji:'🌮', price:150, coinPrice:75,  category:'Snacks' },
+        { name:'Hot Dog',               emoji:'🌭', price:130, coinPrice:65,  category:'Snacks' },
+        { name:'Veg Burger',            emoji:'🍔', price:110, coinPrice:55,  category:'Snacks' },
+        { name:'Chocolate Bar',         emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks' },
+        { name:'Pepsi (Large)',         emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks' },
+        { name:'Pepsi (Medium)',        emoji:'🥤', price:60,  coinPrice:30,  category:'Drinks' },
+        { name:'Water Bottle',          emoji:'💧', price:40,  coinPrice:20,  category:'Drinks' },
+        { name:'Fresh Lime Soda',       emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks' },
+        { name:'Combo (Popcorn+Pepsi)', emoji:'🎉', price:230, coinPrice:115, category:'Combos' },
+        { name:'Family Pack',           emoji:'🎊', price:450, coinPrice:225, category:'Combos' },
       ]);
       console.log('🍿 Snacks seeded');
     }
@@ -243,8 +294,8 @@ async function seedDefaults() {
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
-app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', payment:'simulated' }));
-app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', payment:'simulated' }));
+app.get('/',    (req,res) => res.json({ status:'Cine Time API ✅', version:'10.0', payment:'simulated' }));
+app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'10.0', payment:'simulated' }));
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/register', async (req,res) => {
@@ -277,10 +328,8 @@ app.get('/api/user/coins/:uuid', async (req,res) => {
 
 // ── SCREENS ───────────────────────────────────────────────────────────────────
 app.get('/api/screens', async (req,res) => {
-  try {
-    const screens = await Screen.find({ isActive:true }).sort({ name:1 });
-    res.json(screens);
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  try { res.json(await Screen.find({ isActive:true }).sort({ name:1 })); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/screens', async (req,res) => {
@@ -319,12 +368,10 @@ app.delete('/api/admin/screens/:id', async (req,res) => {
 });
 
 // ── SIMULATED PAYMENT ─────────────────────────────────────────────────────────
-// The frontend handles the 2-second delay. Backend just issues a payment ID.
 app.post('/api/payment/simulate', async (req,res) => {
   try {
     const { amount } = req.body;
     if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error:'Invalid amount' });
-    // Generate a deterministic sim payment ID
     const payId = simPayId();
     res.json({ success:true, simPaymentId: payId, amount: parseFloat(amount), message:'Simulated payment authorised' });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -355,15 +402,27 @@ const buildShows = (shows, timings) => {
   return [];
 };
 
+const parseSeatCategories = (cats) => {
+  if (!Array.isArray(cats) || !cats.length) return [];
+  return cats.map(c => ({
+    name:     c.name    || 'Standard',
+    fromRow:  parseInt(c.fromRow) || 1,
+    toRow:    parseInt(c.toRow)   || 8,
+    price:    parseFloat(c.price) || 150,
+    color:    c.color   || '#007AFF',
+  })).filter(c => c.fromRow > 0 && c.toRow >= c.fromRow && c.price > 0);
+};
+
 app.post('/api/admin/movies', async (req,res) => {
   try {
-    const { title, genre, language, duration, rating, shows, timings, pricing, img, description, isUpcoming } = req.body;
+    const { title, genre, language, duration, rating, shows, timings, pricing, seatCategories, img, description, isUpcoming } = req.body;
     if (!title?.trim()) return res.status(400).json({ error:'Title required' });
     const showsArr = buildShows(shows, timings);
     const movie = await Movie.findOneAndUpdate({ title:title.trim() },
       { title:title.trim(), genre, language, duration, rating:parseFloat(rating)||8.0,
         shows:showsArr, timings:showsArr.map(s=>s.time),
         pricing: pricing || { morning:120, afternoon:150, evening:180, night:200 },
+        seatCategories: parseSeatCategories(seatCategories),
         img:img||'', description:description||'', isActive:true, isUpcoming: isUpcoming||false },
       { new:true, upsert:true }
     );
@@ -373,11 +432,12 @@ app.post('/api/admin/movies', async (req,res) => {
 
 app.put('/api/admin/movies/:id', async (req,res) => {
   try {
-    const { title, genre, language, duration, rating, shows, timings, pricing, img, description, isUpcoming } = req.body;
+    const { title, genre, language, duration, rating, shows, timings, pricing, seatCategories, img, description, isUpcoming } = req.body;
     const showsArr = buildShows(shows, timings);
     const upd = { genre, language, duration, rating:parseFloat(rating)||8.0,
       shows:showsArr, timings:showsArr.map(s=>s.time),
       pricing: pricing || { morning:120, afternoon:150, evening:180, night:200 },
+      seatCategories: parseSeatCategories(seatCategories),
       img:img||'', description:description||'', isActive:true, isUpcoming: isUpcoming||false };
     if (title?.trim()) upd.title = title.trim();
     let saved = null;
@@ -390,7 +450,6 @@ app.put('/api/admin/movies/:id', async (req,res) => {
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
-// ── TOGGLE UPCOMING ────────────────────────────────────────────────────────────
 app.put('/api/admin/movies/:id/toggle-upcoming', async (req,res) => {
   try {
     const movie = await Movie.findById(req.params.id);
@@ -401,13 +460,10 @@ app.put('/api/admin/movies/:id/toggle-upcoming', async (req,res) => {
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
-// ── DELETE → ARCHIVE TO VAULT ──────────────────────────────────────────────────
 app.delete('/api/admin/movies/:id', async (req,res) => {
   try {
     const movie = await Movie.findById(req.params.id);
     if (!movie) return res.status(404).json({ error:'Movie not found' });
-
-    // Aggregate stats before archiving
     const [ticketAgg] = await Ticket.aggregate([
       { $match:{ movieName: movie.title, status:'confirmed' } },
       { $group:{ _id:null, totalRevenue:{ $sum:'$amount' }, totalTickets:{ $sum:{ $size:'$selectedSeats' } } } }
@@ -416,26 +472,14 @@ app.delete('/api/admin/movies/:id', async (req,res) => {
       { $match:{ movieName: movie.title } },
       { $group:{ _id:null, totalRevenue:{ $sum:'$amount' }, totalTickets:{ $sum:{ $size:'$selectedSeats' } } } }
     ]);
-
     const totalRevenue = (ticketAgg?.totalRevenue||0) + (adminAgg?.totalRevenue||0);
     const totalTickets = (ticketAgg?.totalTickets||0) + (adminAgg?.totalTickets||0);
-
-    // Archive to PastMovies
     await PastMovie.create({
-      title:        movie.title,
-      genre:        movie.genre,
-      language:     movie.language,
-      duration:     movie.duration,
-      rating:       movie.rating,
-      pricing:      movie.pricing,
-      img:          movie.img,
-      description:  movie.description,
-      totalTickets,
-      totalRevenue,
-      originalId:   movie._id.toString(),
+      title:movie.title, genre:movie.genre, language:movie.language, duration:movie.duration,
+      rating:movie.rating, pricing:movie.pricing, seatCategories:movie.seatCategories,
+      img:movie.img, description:movie.description,
+      totalTickets, totalRevenue, originalId:movie._id.toString(),
     });
-
-    // Soft-delete
     await Movie.findByIdAndDelete(req.params.id);
     res.json({ message:'Archived to vault', totalRevenue, totalTickets });
   } catch(e) { res.status(400).json({ error:e.message }); }
@@ -446,26 +490,18 @@ app.get('/api/admin/vault', async (req,res) => {
   try {
     const { search } = req.query;
     const query = search ? { title: { $regex: search, $options:'i' } } : {};
-    const past = await PastMovie.find(query).sort({ archivedAt:-1 });
-    res.json(past);
+    res.json(await PastMovie.find(query).sort({ archivedAt:-1 }));
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-// Restore from vault
 app.post('/api/admin/vault/:id/restore', async (req,res) => {
   try {
     const past = await PastMovie.findById(req.params.id);
     if (!past) return res.status(404).json({ error:'Not found in vault' });
     const movie = await Movie.create({
-      title:       past.title,
-      genre:       past.genre,
-      language:    past.language,
-      duration:    past.duration,
-      rating:      past.rating,
-      pricing:     past.pricing,
-      img:         past.img,
-      description: past.description,
-      isActive:    true,
+      title:past.title, genre:past.genre, language:past.language, duration:past.duration,
+      rating:past.rating, pricing:past.pricing, seatCategories:past.seatCategories||[],
+      img:past.img, description:past.description, isActive:true,
     });
     await PastMovie.findByIdAndDelete(req.params.id);
     res.json({ message:'Restored', movie });
@@ -524,11 +560,25 @@ app.get('/api/booked-seats/:movieName/:timing', async (req,res) => {
 // ── BOOK TICKET ───────────────────────────────────────────────────────────────
 app.post('/api/book', async (req,res) => {
   try {
-    const { userUUID, username, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, coinsUsed, paymentMethod, simPaymentId, isUpcoming } = req.body;
+    const { userUUID, username, movieName, timing, screenName, rows, seatsPerRow,
+            selectedSeats, amount, coinsUsed, paymentMethod, simPaymentId, isUpcoming, seatCategories } = req.body;
     if (!userUUID || !username || !movieName || !timing || !selectedSeats?.length)
       return res.status(400).json({ error:'Missing required fields' });
 
+    const spr = parseInt(seatsPerRow) || 10;
+    const cats = parseSeatCategories(seatCategories||[]);
+
+    // Verify seats still available
+    const q = { movieName, timing, status:'confirmed' };
+    if (screenName) q.screenName = screenName;
+    const [exT, exA] = await Promise.all([Ticket.find(q,'selectedSeats'), AdminBooking.find(q,'selectedSeats')]);
+    const allBooked = [...exT.flatMap(t=>t.selectedSeats), ...exA.flatMap(t=>t.selectedSeats)];
+    const conflicts = selectedSeats.filter(s => allBooked.includes(s));
+    if (conflicts.length) return res.status(409).json({ error:`Seats ${conflicts.map(s=>s+1).join(', ')} already booked` });
+
     let actualCoinsUsed = 0, coinsEarned = 0;
+    let finalAmount = amount || 0;
+
     if (paymentMethod === 'coins') {
       const needed = 500 * selectedSeats.length;
       const user = await User.findOne({ uuid: userUUID });
@@ -536,34 +586,45 @@ app.post('/api/book', async (req,res) => {
         return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
       await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:-needed } });
       actualCoinsUsed = needed;
+      finalAmount = 0;
     } else {
+      // Recalculate server-side for integrity
+      if (cats.length) {
+        const { total, details } = calcSeatAmount(selectedSeats.map(s=>parseInt(s)), spr, cats, 150);
+        finalAmount = total;
+      }
       coinsEarned = selectedSeats.length * 10;
       await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:coinsEarned } });
     }
+
+    const { details: seatDetails } = cats.length
+      ? calcSeatAmount(selectedSeats.map(s=>parseInt(s)), spr, cats, 150)
+      : { details: [] };
 
     let eTicketQR = null;
     try {
       eTicketQR = await qrcode.toDataURL(JSON.stringify({
         app:'CINETIME', uuid:userUUID, user:username, movie:movieName, timing,
         screen:screenName||'', seats:selectedSeats.map(s=>s+1),
-        upcoming: isUpcoming||false, txId:simPaymentId||Date.now()
+        upcoming:isUpcoming||false, txId:simPaymentId||Date.now()
       }), { width:300, margin:2 });
     } catch(e) { console.error('QR error:', e.message); }
 
     const ticket = new Ticket({
       userUUID, username, movieName, timing, screenName:screenName||'',
-      rows:parseInt(rows)||8, seatsPerRow:parseInt(seatsPerRow)||10,
+      rows:parseInt(rows)||8, seatsPerRow:spr,
       selectedSeats: selectedSeats.map(s => parseInt(s)),
-      amount: paymentMethod==='coins' ? 0 : (amount||0),
+      seatDetails,
+      amount: finalAmount,
       coinsUsed:actualCoinsUsed, coinsEarned,
       paymentMethod:paymentMethod||'simulated',
       simPaymentId:simPaymentId||null,
-      isUpcoming: isUpcoming||false,
+      isUpcoming:isUpcoming||false,
       status:'confirmed', eTicketQR,
     });
     await ticket.save();
     const user = await User.findOne({ uuid: userUUID });
-    res.status(201).json({ message:'Booked', coinsEarned, eTicketQR, ticketId:ticket._id, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
+    res.status(201).json({ message:'Booked', coinsEarned, eTicketQR, ticketId:ticket._id, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0, finalAmount });
   } catch(e) { console.error('Book ticket:', e); res.status(500).json({ error:'Booking failed: '+e.message }); }
 });
 
@@ -579,17 +640,13 @@ app.post('/api/cancel-ticket/:ticketId', async (req,res) => {
     ticket.status = 'cancelled';
     ticket.cancelledAt = new Date();
 
-    // Refund logic
     let refundAmount = 0;
     if (ticket.paymentMethod === 'coins') {
-      // Refund coins
       await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins: ticket.coinsUsed } });
     } else if (ticket.amount > 0) {
       refundAmount = ticket.amount;
-      // Add refund to wallet
       await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ wallet: refundAmount } });
     }
-    // Reclaim earned coins
     if (ticket.coinsEarned > 0) {
       await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins: -ticket.coinsEarned } });
     }
@@ -597,11 +654,11 @@ app.post('/api/cancel-ticket/:ticketId', async (req,res) => {
     await ticket.save();
 
     const user = await User.findOne({ uuid: userUUID });
-    res.json({ message:'Cancelled', refundAmount, refundCoins: ticket.paymentMethod==='coins'?ticket.coinsUsed:0, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
+    res.json({ message:'Cancelled', refundAmount, refundCoins:ticket.paymentMethod==='coins'?ticket.coinsUsed:0, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
   } catch(e) { res.status(500).json({ error:'Cancellation failed: '+e.message }); }
 });
 
-// ── HISTORY (UUID-based) ──────────────────────────────────────────────────────
+// ── HISTORY ───────────────────────────────────────────────────────────────────
 app.get('/api/history/:uuid', async (req,res) => {
   try {
     const uuid = req.params.uuid;
@@ -666,8 +723,14 @@ app.get('/api/admin/detailed-seats/:movieName/:timing', async (req,res) => {
     if (screenName) q.screenName = screenName;
     const [tickets, adminBks] = await Promise.all([Ticket.find(q), AdminBooking.find(q)]);
     const seatMap = {};
-    tickets.forEach(t  => t.selectedSeats.forEach(s => { seatMap[s] = { user:t.username, type:'user', method:t.paymentMethod }; }));
-    adminBks.forEach(t => t.selectedSeats.forEach(s => { seatMap[s] = { user:t.username+' (Admin)', type:'admin' }; }));
+    tickets.forEach(t  => t.selectedSeats.forEach(s => {
+      const det = t.seatDetails?.find(d=>d.seat===s);
+      seatMap[s] = { user:t.username, type:'user', method:t.paymentMethod, category:det?.category||'', price:det?.price||t.amount/Math.max(t.selectedSeats.length,1) };
+    }));
+    adminBks.forEach(t => t.selectedSeats.forEach(s => {
+      const det = t.seatDetails?.find(d=>d.seat===s);
+      seatMap[s] = { user:t.username+' (Admin)', type:'admin', category:det?.category||'' };
+    }));
     res.json(seatMap);
   } catch { res.json({}); }
 });
@@ -684,17 +747,24 @@ app.delete('/api/admin/refresh/:movieName/:timing', async (req,res) => {
 
 app.post('/api/admin/book-direct', async (req,res) => {
   try {
-    const { username, userUUID, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, notes, isUpcoming } = req.body;
+    const { username, userUUID, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, notes, isUpcoming, seatCategories } = req.body;
     if (!username || !movieName || !timing || !selectedSeats?.length)
       return res.status(400).json({ error:'Missing fields' });
     const seats = selectedSeats.map(s => parseInt(s)-1).filter(n => !isNaN(n) && n >= 0);
     if (!seats.length) return res.status(400).json({ error:'No valid seats' });
+    const spr = parseInt(seatsPerRow) || 10;
+    const cats = parseSeatCategories(seatCategories||[]);
     const q = { movieName, timing, status:'confirmed' };
     if (screenName) q.screenName = screenName;
-    const [ex, ax] = await Promise.all([Ticket.find(q), AdminBooking.find(q)]);
+    const [ex, ax] = await Promise.all([Ticket.find(q,'selectedSeats'), AdminBooking.find(q,'selectedSeats')]);
     const allBooked = [...ex.flatMap(t=>t.selectedSeats), ...ax.flatMap(t=>t.selectedSeats)];
     const conflicts = seats.filter(s => allBooked.includes(s));
     if (conflicts.length) return res.status(400).json({ error:`Seats ${conflicts.map(s=>s+1).join(', ')} already booked` });
+
+    const { details: seatDetails, total: calcAmount } = cats.length
+      ? calcSeatAmount(seats, spr, cats, amount||0)
+      : { details: [], total: amount||0 };
+
     let eTicketQR = null;
     try {
       eTicketQR = await qrcode.toDataURL(JSON.stringify({
@@ -702,11 +772,13 @@ app.post('/api/admin/book-direct', async (req,res) => {
         screen:screenName||'', seats:seats.map(s=>s+1), txId:Date.now()
       }), { width:300, margin:2 });
     } catch(e) { console.error('QR:', e.message); }
+
     const booking = new AdminBooking({
-      userUUID: userUUID||'admin', username, movieName, timing, screenName:screenName||'',
-      rows:parseInt(rows)||8, seatsPerRow:parseInt(seatsPerRow)||10,
-      selectedSeats:seats, amount:amount||0, notes:notes||'',
-      isUpcoming:isUpcoming||false, status:'confirmed', eTicketQR
+      userUUID:userUUID||'admin', username, movieName, timing, screenName:screenName||'',
+      rows:parseInt(rows)||8, seatsPerRow:spr,
+      selectedSeats:seats, seatDetails,
+      amount:cats.length?calcAmount:(amount||0),
+      notes:notes||'', isUpcoming:isUpcoming||false, status:'confirmed', eTicketQR
     });
     await booking.save();
     res.status(201).json({ message:'Booking created', bookingId:booking._id, eTicketQR });
@@ -768,12 +840,12 @@ app.post('/api/chatbot', async (req,res) => {
     let reply;
     if      (lower.includes('upcoming'))                             reply = `🎬 Coming soon: ${movies.filter(m=>m.isUpcoming).map(m=>m.title).join(', ')||'Nothing announced yet!'}`;
     else if (lower.includes('movie') || lower.includes('showing'))  reply = `Now showing: ${movies.filter(m=>!m.isUpcoming).map(m=>m.title).join(', ')} 🎬`;
-    else if (lower.includes('price') || lower.includes('ticket'))   reply = '🎟 Morning ₹120 · Afternoon ₹150 · Evening ₹180 · Night ₹200. Or 500 CineCoins!';
+    else if (lower.includes('price') || lower.includes('ticket'))   reply = '🎟 Zone pricing: Balcony/Upper/Middle/Lower sections — prices vary per movie. Check the seat map!';
     else if (lower.includes('coin'))                                 reply = '🪙 Earn 10 coins/ticket, 5/snack. 500 coins = free ticket!';
-    else if (lower.includes('cancel'))                               reply = '❌ You can cancel tickets from "My Bookings". Refunds go to your CineWallet.';
-    else if (lower.includes('wallet') || lower.includes('refund'))  reply = '💰 Refunds land in your CineWallet instantly. Reuse for future bookings!';
+    else if (lower.includes('cancel'))                               reply = '❌ Cancel tickets from "My Bookings". Refunds go to CineWallet instantly.';
+    else if (lower.includes('wallet') || lower.includes('refund'))  reply = '💰 Refunds land in CineWallet instantly. Reuse for future bookings!';
     else if (lower.includes('snack') || lower.includes('food'))     reply = '🍿 Popcorn, Nachos, Combos and more at the Snack Bar!';
-    else reply = "Thanks for asking! I'm CineBot 🎬 Ask about movies, prices, CineCoins or cancellations!";
+    else reply = "Hi! I'm CineBot 🎬 Ask about movies, seat zones, prices, CineCoins or cancellations!";
     res.json({ reply });
   } catch { res.json({ reply:"Having trouble 🤖" }); }
 });
@@ -781,7 +853,8 @@ app.post('/api/chatbot', async (req,res) => {
 // ── START ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Cine Time v9.0 on port ${PORT}`);
-  console.log(`💳 Payment: Simulated Mode (no gateway required)`);
+  console.log(`🚀 Cine Time v10.0 on port ${PORT}`);
+  console.log(`💳 Payment: Simulated Mode`);
+  console.log(`🪑 Seat Zones: Balcony / Upper / Middle / Lower per movie`);
   console.log(`🍃 MongoDB:  ${mongoURI.includes('localhost') ? 'Local' : 'Atlas'}`);
 });

@@ -11,8 +11,9 @@ app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], cr
 app.use(express.json({ limit: '10mb' }));
 
 // ── RAZORPAY ──────────────────────────────────────────────────────────────────
-const RZP_KEY_ID     = (process.env.RAZORPAY_KEY_ID     || 'rzp_test_SmNcizKVCBNmvb').trim();
-const RZP_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || 'ruaFEBMo5uGmHcrO0ARGWhBp').trim();
+// ✅ Updated credentials — read from env first, then fallback to hardcoded
+const RZP_KEY_ID     = process.env.RAZORPAY_KEY_ID     || 'rzp_test_Soiy52I6HkMaEN';
+const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'dlNQKRcxwDzqNd6aKqF7AyOv';
 
 console.log('🔑 Razorpay Key:', RZP_KEY_ID.slice(0,20)+'...');
 console.log('🔑 Secret length:', RZP_KEY_SECRET.length);
@@ -21,7 +22,7 @@ let razorpay = null;
 try {
   if (RZP_KEY_ID && RZP_KEY_SECRET && RZP_KEY_ID.startsWith('rzp_')) {
     razorpay = new Razorpay({ key_id: RZP_KEY_ID, key_secret: RZP_KEY_SECRET });
-    console.log('✅ Razorpay initialized');
+    console.log('✅ Razorpay initialized:', RZP_KEY_ID.slice(0,16)+'...');
   } else {
     console.warn('⚠️  Razorpay keys invalid — will use simulated mode');
   }
@@ -266,8 +267,8 @@ async function seedDefaults() {
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
-app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.0', razorpay: razorpay ? 'live' : 'simulated' }));
-app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'8.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID.slice(0,14)+'...' }));
+app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID.slice(0,16)+'...' }));
+app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID }));
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/register', async (req,res) => {
@@ -295,7 +296,7 @@ app.get('/api/user/coins/:username', async (req,res) => {
   catch { res.json({ cineCoins:0 }); }
 });
 
-// ── SCREENS ── IMPORTANT: must be defined BEFORE catch-all or generic routes ──
+// ── SCREENS ───────────────────────────────────────────────────────────────────
 app.get('/api/screens', async (req,res) => {
   try {
     const screens = await Screen.find({ isActive:true }).sort({ name:1 });
@@ -346,57 +347,54 @@ app.delete('/api/admin/screens/:id', async (req,res) => {
   } catch { res.status(400).json({ error:'Failed' }); }
 });
 
-// ── RAZORPAY ──────────────────────────────────────────────────────────────────
-app.post('/api/payment/create-order', async (req,res) => {
+// ── RAZORPAY ─────────────────────────────────────────────────────────────────
+// ✅ FIXED: Always returns keyId so frontend uses the correct key
+app.post('/api/payment/create-order', async (req, res) => {
   try {
     const amount = parseFloat(req.body.amount);
-    console.log(`💰 create-order: ₹${amount}, razorpay=${razorpay ? 'live' : 'null'}`);
+    console.log(`💰 create-order: ₹${amount} | razorpay=${razorpay ? 'LIVE' : 'SIMULATED'} | key=${RZP_KEY_ID.slice(0,16)}...`);
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error:'Invalid amount' });
-    }
-
-    // If Razorpay not initialized, return simulated order
+    // Always return keyId so frontend can use it
     if (!razorpay) {
-      console.log('⚠️  Razorpay not initialized — returning simulated order');
       return res.json({
         orderId:   `order_SIM_${Date.now()}`,
-        amount:    Math.round(amount * 100),
+        amount:    Math.round(amount*100),
         amountINR: amount,
         currency:  'INR',
-        keyId:     RZP_KEY_ID,
+        keyId:     RZP_KEY_ID,   // ✅ always present
         simulated: true,
+        reason:    'Razorpay not initialized'
       });
     }
 
     const order = await razorpay.orders.create({
-      amount:   Math.round(amount * 100),
+      amount:   Math.round(amount*100),
       currency: req.body.currency || 'INR',
       receipt:  req.body.receipt  || `rcpt_${Date.now()}`,
       notes:    req.body.notes    || {},
     });
-
-    console.log('✅ Razorpay order created:', order.id, '₹'+amount);
-    res.json({
+    console.log('✅ Real Razorpay order:', order.id);
+    return res.json({
       orderId:   order.id,
       amount:    order.amount,
       amountINR: amount,
       currency:  order.currency,
-      keyId:     RZP_KEY_ID,
+      keyId:     RZP_KEY_ID,   // ✅ always present
       simulated: false,
     });
-  } catch(err) {
-    const msg = err.error?.description || err.message || 'Unknown error';
+  } catch (err) {
+    const msg = err.error?.description || err.message || 'Unknown';
     console.error('❌ create-order error:', msg);
-    // Always return a simulated order on error so frontend can still book
-    res.json({
+    // Even on error, return a usable simulated order WITH keyId
+    return res.json({
       orderId:   `order_SIM_${Date.now()}`,
-      amount:    Math.round((parseFloat(req.body.amount)||0) * 100),
-      amountINR: parseFloat(req.body.amount) || 0,
+      amount:    Math.round((parseFloat(req.body.amount)||0)*100),
+      amountINR: parseFloat(req.body.amount)||0,
       currency:  'INR',
-      keyId:     RZP_KEY_ID,
+      keyId:     RZP_KEY_ID,   // ✅ always present
       simulated: true,
-      errorNote: msg,
+      reason:    msg,
     });
   }
 });
@@ -406,7 +404,6 @@ app.post('/api/payment/verify', async (req,res) => {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
       return res.status(400).json({ error:'Missing fields' });
-    // Simulated orders always pass
     if (razorpay_order_id.startsWith('order_SIM_') || razorpay_order_id.startsWith('order_FALLBACK_'))
       return res.json({ success:true, simulated:true });
     const expected = crypto.createHmac('sha256', RZP_KEY_SECRET)
@@ -478,11 +475,23 @@ app.put('/api/admin/movies/:id', async (req,res) => {
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
+// ✅ FIXED: Cascading delete — removes all Tickets & AdminBookings for the movie
 app.delete('/api/admin/movies/:id', async (req,res) => {
   try {
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) await Movie.findByIdAndDelete(req.params.id);
-    res.json({ message:'Deleted' });
-  } catch { res.status(400).json({ error:'Delete failed' }); }
+    let movieTitle = null;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      const m = await Movie.findByIdAndDelete(req.params.id);
+      movieTitle = m?.title || null;
+    }
+    if (movieTitle) {
+      const [td, ad] = await Promise.all([
+        Ticket.deleteMany({ movieName: movieTitle }),
+        AdminBooking.deleteMany({ movieName: movieTitle }),
+      ]);
+      console.log(`🗑 Cascading delete for "${movieTitle}": ${td.deletedCount} tickets, ${ad.deletedCount} admin bookings`);
+    }
+    res.json({ message:'Deleted', cascaded: movieTitle ? true : false });
+  } catch(e) { res.status(400).json({ error:'Delete failed: '+e.message }); }
 });
 
 // ── SNACKS ────────────────────────────────────────────────────────────────────
@@ -551,6 +560,9 @@ app.post('/api/parking/book', async (req,res) => {
         return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
       await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:-needed } });
       actualCoinsUsed = needed;
+    } else if (paymentMethod === 'offline') {
+      // ✅ Offline booking — no coins earned, no payment needed
+      coinsEarned = 0;
     } else {
       coinsEarned = slot.slotType !== 'Disabled' ? 5 : 0;
       if (coinsEarned > 0) await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:coinsEarned } });
@@ -587,6 +599,51 @@ app.delete('/api/admin/parking/reset', async (req,res) => {
     await ParkingSlot.updateMany({}, { isBooked:false, bookedBy:null, bookingDate:null, showTiming:null, movieName:null });
     res.json({ message:'All released' });
   } catch { res.status(500).json({ error:'Reset failed' }); }
+});
+
+// ✅ NEW: Admin offline parking booking (no payment gateway)
+app.post('/api/admin/parking/offline', async (req,res) => {
+  try {
+    const { slotNumber, username, showTiming, movieName, notes } = req.body;
+    if (!slotNumber || !username) return res.status(400).json({ error:'slotNumber and username required' });
+    const slot = await ParkingSlot.findOne({ slotNumber });
+    if (!slot)        return res.status(404).json({ error:`Slot ${slotNumber} not found` });
+    if (slot.isBooked) return res.status(400).json({ error:`Slot ${slotNumber} already booked` });
+    slot.isBooked    = true;
+    slot.bookedBy    = username;
+    slot.bookingDate = new Date();
+    slot.showTiming  = showTiming || '';
+    slot.movieName   = movieName  || 'General';
+    await slot.save();
+    await ParkingBooking.create({
+      username, slotNumber:slot.slotNumber, block:slot.block||slot.slotNumber.charAt(0),
+      slotType:slot.slotType, price:0, coinPrice:slot.coinPrice,
+      coinsUsed:0, coinsEarned:0, paymentMethod:'offline',
+      razorpayOrderId:null, razorpayPaymentId:null,
+      movieName:movieName||'General', showTiming:showTiming||'',
+      status:'confirmed',
+    });
+    res.json({ message:'Offline parking booked', slot });
+  } catch(e) { res.status(500).json({ error:'Offline parking failed: '+e.message }); }
+});
+
+// ✅ NEW: Admin offline snack order (no payment gateway)
+app.post('/api/admin/snacks/offline', async (req,res) => {
+  try {
+    const { username, items, total, notes } = req.body;
+    if (!username || !items?.length) return res.status(400).json({ error:'username and items required' });
+    const order = new RefreshmentOrder({
+      username, movieName:'Admin Offline', timing:'',
+      items: items.map(i=>({ name:i.name, qty:i.qty||1, price:i.price||0, coinPrice:i.coinPrice||0 })),
+      total: total || items.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0),
+      coinsUsed:0, coinsEarned:0,
+      paymentMethod:'offline',
+      razorpayOrderId:null, razorpayPaymentId:null,
+      status:'confirmed',
+    });
+    await order.save();
+    res.status(201).json({ message:'Offline snack order placed', orderId:order._id });
+  } catch(e) { res.status(400).json({ error:'Offline snack order failed: '+e.message }); }
 });
 
 // ── BOOKED SEATS ──────────────────────────────────────────────────────────────
@@ -673,7 +730,7 @@ app.post('/api/refreshments/order', async (req,res) => {
         return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
       await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:-needed } });
       actualCoinsUsed = needed;
-    } else {
+    } else if (paymentMethod !== 'offline') {
       coinsEarned = 5;
       await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:5 } });
     }
@@ -761,21 +818,24 @@ app.post('/api/admin/book-direct', async (req,res) => {
   } catch(e) { res.status(500).json({ error:'Direct booking failed: '+e.message }); }
 });
 
+// ✅ FIXED: Analytics now sums Ticket + AdminBooking revenue, uses $unionWith for popular movies
 app.get('/api/admin/analytics', async (req,res) => {
   try {
-    const [tRev,pRev,sRev,coins,tb,ab,tu] = await Promise.all([
+    const [tRev, pRev, sRev, adminRev, coins, tb, ab, tu] = await Promise.all([
       Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
       ParkingBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$price' } } }]),
       RefreshmentOrder.aggregate([{ $group:{ _id:null, total:{ $sum:'$total' } } }]),
+      AdminBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
       Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$coinsEarned' } } }]),
       Ticket.countDocuments(), AdminBooking.countDocuments(),
       User.countDocuments({ role:{ $ne:'admin' } }),
     ]);
+
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0,0,0,0);
     const fmt = '%m/%d';
-    const [tD,pD,sD] = await Promise.all([
+    const [tD, pD, sD] = await Promise.all([
       Ticket.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$amount' }, bookings:{ $sum:1 } } }]),
       ParkingBooking.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$price' } } }]),
       RefreshmentOrder.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$total' } } }]),
@@ -791,19 +851,39 @@ app.get('/api/admin/analytics', async (req,res) => {
         bookings: tD.find(r=>r._id===label)?.bookings||0,
       });
     }
-    const movieStats = await Ticket.aggregate([
-      { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
-      { $sort:{ count:-1 } }, { $limit:5 }
-    ]);
+
+    // ✅ Popular movies: union of Ticket + AdminBooking collections
+    let movieStats = [];
+    try {
+      movieStats = await Ticket.aggregate([
+        { $project: { movieName:1, amount:1 } },
+        { $unionWith: { coll:'adminbookings', pipeline:[{ $project:{ movieName:1, amount:1 } }] } },
+        { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
+        { $sort:{ count:-1 } },
+        { $limit:5 },
+      ]);
+    } catch(e) {
+      // Fallback if $unionWith not supported (MongoDB < 4.4)
+      movieStats = await Ticket.aggregate([
+        { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
+        { $sort:{ count:-1 } }, { $limit:5 }
+      ]);
+    }
+
+    const ticketRev   = tRev[0]?.total   || 0;
+    const adminBkRev  = adminRev[0]?.total || 0;
+    const parkRev     = pRev[0]?.total    || 0;
+    const snackRev    = sRev[0]?.total    || 0;
+
     res.json({
-      totalRevenue:       (tRev[0]?.total||0) + (pRev[0]?.total||0) + (sRev[0]?.total||0),
-      ticketRevenue:      tRev[0]?.total||0,
-      parkingRevenue:     pRev[0]?.total||0,
-      refreshmentRevenue: sRev[0]?.total||0,
+      totalRevenue:       ticketRev + adminBkRev + parkRev + snackRev,
+      ticketRevenue:      ticketRev + adminBkRev,  // ✅ includes admin bookings
+      parkingRevenue:     parkRev,
+      refreshmentRevenue: snackRev,
       totalBookings:      tb,
       totalAdminBookings: ab,
       totalUsers:         tu,
-      coinsIssued:        coins[0]?.total||0,
+      coinsIssued:        coins[0]?.total || 0,
       dailyRevenue,
       movieStats,
     });
@@ -830,7 +910,7 @@ app.post('/api/chatbot', async (req,res) => {
 // ── START ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Cine Time v8.0 on port ${PORT}`);
-  console.log(`🔑 Razorpay: ${razorpay ? 'LIVE — ' + RZP_KEY_ID.slice(0,16)+'...' : 'SIMULATED MODE'}`);
+  console.log(`🚀 Cine Time v9.0 on port ${PORT}`);
+  console.log(`🔑 Razorpay: ${razorpay ? 'LIVE — ' + RZP_KEY_ID : 'SIMULATED MODE'}`);
   console.log(`🍃 MongoDB:  ${mongoURI.includes('localhost') ? 'Local' : 'Atlas'}`);
 });

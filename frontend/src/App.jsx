@@ -4,8 +4,8 @@ import axios from 'axios';
 const API = 'https://cinetime-bq7l.onrender.com/api';
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = '7777';
-// Razorpay key – also returned by the server, but keep as fallback
-const RZP_KEY_FALLBACK = 'rzp_test_SmNcizKVCBNmvb';
+// ✅ FIXED: This is only a true last-resort fallback. Backend keyId always takes priority.
+const RZP_KEY_FALLBACK = 'rzp_test_SoR1WBT37yeHDe';
 
 /* ─── LOCAL DEFAULTS ─────────────────────────────────────────────────────────*/
 const DEFAULT_SCREENS = [
@@ -20,17 +20,17 @@ const DEFAULT_MOVIES = [
   { _id:'m4', title:'Jawan',       genre:'Action/Drama',    language:'Hindi',   duration:'2h 49m', rating:7.5, timings:['9:30 AM','1:00 PM','5:30 PM','9:30 PM'],   shows:[], pricing:{morning:120,afternoon:150,evening:180,night:200}, img:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7e/Jawan_film_poster.jpg/220px-Jawan_film_poster.jpg', description:'A prison warden recruits women to fight injustice.' },
 ];
 const DEFAULT_SNACKS = [
-  { _id:'sn1', name:'Popcorn (Large)',       emoji:'🍿', price:180, coinPrice:90,  category:'Snacks', img:'' },
-  { _id:'sn2', name:'Popcorn (Medium)',      emoji:'🍿', price:120, coinPrice:60,  category:'Snacks', img:'' },
-  { _id:'sn3', name:'Nachos + Cheese',       emoji:'🌮', price:150, coinPrice:75,  category:'Snacks', img:'' },
-  { _id:'sn4', name:'Hot Dog',               emoji:'🌭', price:130, coinPrice:65,  category:'Snacks', img:'' },
-  { _id:'sn5', name:'Veg Burger',            emoji:'🍔', price:110, coinPrice:55,  category:'Snacks', img:'' },
-  { _id:'sn6', name:'Chocolate Bar',         emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks', img:'' },
-  { _id:'sn7', name:'Pepsi (Large)',         emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks', img:'' },
-  { _id:'sn8', name:'Water Bottle',          emoji:'💧', price:40,  coinPrice:20,  category:'Drinks', img:'' },
-  { _id:'sn9', name:'Fresh Lime Soda',       emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks', img:'' },
-  { _id:'sn10',name:'Combo (Popcorn+Pepsi)', emoji:'🎉', price:230, coinPrice:115, category:'Combos', img:'' },
-  { _id:'sn11',name:'Family Pack',           emoji:'🎊', price:450, coinPrice:225, category:'Combos', img:'' },
+  { _id:'sn1',  name:'Popcorn (Large)',       emoji:'🍿', price:180, coinPrice:90,  category:'Snacks', img:'' },
+  { _id:'sn2',  name:'Popcorn (Medium)',      emoji:'🍿', price:120, coinPrice:60,  category:'Snacks', img:'' },
+  { _id:'sn3',  name:'Nachos + Cheese',       emoji:'🌮', price:150, coinPrice:75,  category:'Snacks', img:'' },
+  { _id:'sn4',  name:'Hot Dog',               emoji:'🌭', price:130, coinPrice:65,  category:'Snacks', img:'' },
+  { _id:'sn5',  name:'Veg Burger',            emoji:'🍔', price:110, coinPrice:55,  category:'Snacks', img:'' },
+  { _id:'sn6',  name:'Chocolate Bar',         emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks', img:'' },
+  { _id:'sn7',  name:'Pepsi (Large)',         emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks', img:'' },
+  { _id:'sn8',  name:'Water Bottle',          emoji:'💧', price:40,  coinPrice:20,  category:'Drinks', img:'' },
+  { _id:'sn9',  name:'Fresh Lime Soda',       emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks', img:'' },
+  { _id:'sn10', name:'Combo (Popcorn+Pepsi)', emoji:'🎉', price:230, coinPrice:115, category:'Combos', img:'' },
+  { _id:'sn11', name:'Family Pack',           emoji:'🎊', price:450, coinPrice:225, category:'Combos', img:'' },
 ];
 function buildDefaultParking() {
   const s = [];
@@ -137,6 +137,7 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .chip-red{background:var(--accent-bg);color:var(--accent)}.chip-red:hover{background:var(--accent);color:#fff}
 .chip-blue{background:#EBF4FF;color:var(--blue)}.chip-blue:hover{background:var(--blue);color:#fff}
 .chip-grey{background:var(--card2);color:var(--t3);border:1px solid var(--bdr)}
+.chip-amber{background:rgba(255,184,0,.15);color:#B8860B}.chip-amber:hover{background:#FFB800;color:#fff}
 .inp-wrap{position:relative;margin-bottom:10px}
 .inp-ico{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.4;pointer-events:none}
 .inp{width:100%;padding:12px 13px 12px 40px;background:var(--card2);border:2px solid transparent;border-radius:13px;font-size:14px;font-weight:600;color:var(--t1);outline:none;font-family:'Figtree',sans-serif;transition:all .2s}
@@ -181,7 +182,7 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .pay-lbl{color:var(--t3)}.pay-val{color:var(--t1)}.pay-total .pay-val{color:var(--accent)}
 .rzp-info{background:linear-gradient(135deg,#EEF2FF,#E0E7FF);border:1px solid rgba(45,106,219,.2);border-radius:13px;padding:14px 16px;margin-bottom:14px;text-align:center}
 .cat-row{display:flex;gap:7px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px}
-.cat-btn{background:var(--card2);color:var(--t3);border:2px solid var(--bdr);border-radius:20px;padding:6px 14px;font-family:'Figtree',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .18s}
+.cat-btn{background:var(--card2);color:var(--t3);border:2px solid var(--bdr);border-radius:20px;padding:6px 14px;font-family:'Figtree',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .18px}
 .cat-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
 .menu-card{background:var(--card);border-radius:var(--r2);border:2px solid var(--bdr);box-shadow:var(--sh1);cursor:pointer;position:relative;overflow:hidden;transition:all .2s}
@@ -275,6 +276,9 @@ body{background:var(--bg);font-family:'Figtree',-apple-system,sans-serif;color:v
 .aps-dis{background:rgba(255,255,255,.06);color:rgba(255,255,255,.3)}
 .eticket{background:var(--card);border-radius:var(--r4);padding:30px 24px;max-width:480px;width:100%;box-shadow:var(--sh3);animation:pop .3s ease;text-align:center;max-height:90vh;overflow-y:auto}
 .offline-badge{background:rgba(255,184,0,.15);color:#FFB800;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px}
+/* ── OFFLINE BOOKING PANEL ── */
+.offline-panel{background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.2);border-radius:var(--r2);padding:18px;margin-bottom:12px}
+.offline-panel-title{font-size:13px;font-weight:800;color:#FFB800;margin-bottom:12px;display:flex;align-items:center;gap:7px}
 `;
 
 /* ─── UTILS ──────────────────────────────────────────────────────────────────*/
@@ -306,8 +310,13 @@ function ETicket({data,onClose,email}){
         <div style={{fontSize:40,marginBottom:10}}>🎉</div>
         <div style={{fontSize:22,fontWeight:900,marginBottom:6}}>Booking Confirmed!</div>
         <div style={{background:'var(--card2)',borderRadius:'var(--r2)',padding:'14px 18px',marginBottom:16,textAlign:'left'}}>
-          {[['Movie',data.movieName],['Show',data.timing],data.screenName?['Screen','🖥️ '+data.screenName]:null,['Seats',data.seats?.map(s=>s+1).join(', ')],data.amount>0?['Paid','₹'+data.amount]:null]
-            .filter(Boolean).map(([l,v])=>(
+          {[
+            ['Movie', data.movieName],
+            ['Show',  data.timing],
+            data.screenName ? ['Screen','🖥️ '+data.screenName] : null,
+            data.seats?.length ? ['Seats', data.seats.map(s=>s+1).join(', ')] : null,
+            data.amount>0 ? ['Paid','₹'+data.amount] : null,
+          ].filter(Boolean).map(([l,v])=>(
             <div key={l} style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
               <span style={{color:'var(--t3)',fontSize:12}}>{l}</span>
               <span style={{fontWeight:800,fontSize:13,color:l==='Seats'?'var(--accent)':l==='Paid'?'var(--green)':'inherit'}}>{v}</span>
@@ -419,7 +428,6 @@ function AdminApp({onBack}){
   const [movies,setMovies]=useState(()=>LS.get('ct_movies',DEFAULT_MOVIES));
   const [snacks,setSnacks]=useState(()=>LS.get('ct_admin_snacks',DEFAULT_SNACKS));
   const [parking,setParking]=useState(()=>LS.get('ct_admin_parking',buildDefaultParking()));
-  // screens: start with local defaults, update when server responds
   const [screens,setScreens]=useState(()=>LS.get('ct_screens',DEFAULT_SCREENS));
   const [screensOnline,setScreensOnline]=useState(false);
 
@@ -440,8 +448,8 @@ function AdminApp({onBack}){
   const [imgPrev,setImgPrev]=useState('');
   const [mSaving,setMSaving]=useState(false);
   const [schedule,setSchedule]=useState([]);
-  const [nst,setNst]=useState(''); // new show time
-  const [nss,setNss]=useState(''); // new show screen id
+  const [nst,setNst]=useState('');
+  const [nss,setNss]=useState('');
 
   // Screen form
   const emptyS={name:'',rows:'8',seatsPerRow:'10',screenType:'Standard'};
@@ -449,7 +457,7 @@ function AdminApp({onBack}){
   const [editSId,setEditSId]=useState(null);
   const [sSaving,setSSaving]=useState(false);
 
-  // Snack form
+  // Snack form — ✅ includes img field
   const emptySn={name:'',emoji:'🍿',price:'',coinPrice:'',category:'Snacks',img:''};
   const [snForm,setSnForm]=useState(emptySn);
   const [editSnId,setEditSnId]=useState(null);
@@ -460,6 +468,16 @@ function AdminApp({onBack}){
   const [bForm,setBForm]=useState(emptyB);
   const [bLoading,setBLoading]=useState(false);
   const [bResult,setBResult]=useState(null);
+
+  // ✅ NEW: Offline parking booking form
+  const emptyOfflinePark={slotNumber:'',username:'',movieName:'',showTiming:'',notes:''};
+  const [offlineParkForm,setOfflineParkForm]=useState(emptyOfflinePark);
+  const [offlineParkLoading,setOfflineParkLoading]=useState(false);
+
+  // ✅ NEW: Offline snack order form
+  const [offlineSnackUser,setOfflineSnackUser]=useState('');
+  const [offlineCart,setOfflineCart]=useState({});
+  const [offlineSnackLoading,setOfflineSnackLoading]=useState(false);
 
   const saveM=(m)=>{setMovies(m);broadcast(m);};
   const saveSn=(s)=>{setSnacks(s);LS.set('ct_admin_snacks',s);};
@@ -493,18 +511,12 @@ function AdminApp({onBack}){
     if(sc.status==='fulfilled'&&sc.value.data){
       const data=sc.value.data;
       if(Array.isArray(data)&&data.length){
-        saveSc(data);
-        setScreensOnline(true);
-        setBackendOk(true);
-        console.log('✅ Screens from server:',data.length);
+        saveSc(data); setScreensOnline(true); setBackendOk(true);
       }else{
-        console.warn('⚠️  /api/screens returned empty — using local defaults');
         setScreensOnline(false);
       }
     }else{
-      console.warn('⚠️  /api/screens failed:',sc.reason?.message,' — using local defaults');
-      setScreensOnline(false);
-      setBackendOk(false);
+      setScreensOnline(false); setBackendOk(false);
     }
     setRefreshing(false);
   },[]);
@@ -545,11 +557,11 @@ function AdminApp({onBack}){
     setEditMId(null);setImgPrev('');setMForm(emptyM);setSchedule([]);setMSaving(false);
   };
   const delMovie=async(id)=>{
-    if(!window.confirm('Delete?'))return;
+    if(!window.confirm('Delete this movie and ALL its bookings?'))return;
     saveM(movies.filter(m=>m._id!==id));
     if(id&&!id.startsWith('local-')&&!id.startsWith('m')&&id.length===24)
       await axios.delete(`${API}/admin/movies/${id}`).catch(()=>{});
-    showToast('🗑 Deleted');
+    showToast('🗑 Deleted (with cascading bookings)');
   };
   const addShow=()=>{
     if(!nst.trim()){showToast('❌ Enter time');return;}
@@ -558,8 +570,7 @@ function AdminApp({onBack}){
     setNst('');setNss('');
   };
 
-  /* ── SCREEN SAVE ─────────────────────────────────────────────
-     Key fix: POST/PUT to server; if 404 fall back to local state */
+  /* ── SCREEN SAVE ─────────────────────────────────────────────*/
   const saveScreen=async()=>{
     if(!sForm.name.trim()){showToast('❌ Name required');return;}
     setSSaving(true);
@@ -569,22 +580,17 @@ function AdminApp({onBack}){
     try{
       let saved;
       if(editSId&&!editSId.startsWith('sc-')){
-        // real mongo id — update
-        const res=await axios.put(`${API}/admin/screens/${editSId}`,pl);
-        saved=res.data;
+        saved=(await axios.put(`${API}/admin/screens/${editSId}`,pl)).data;
         saveSc(screens.map(s=>s._id===editSId?saved:s));
         setScreensOnline(true);
       }else{
-        // new or local id — create
-        const res=await axios.post(`${API}/admin/screens`,pl);
-        saved=res.data;
+        saved=(await axios.post(`${API}/admin/screens`,pl)).data;
         const updated=editSId?screens.map(s=>s._id===editSId?saved:s):[...screens,saved];
         saveSc(updated);
         setScreensOnline(true);
       }
       showToast('✅ Screen saved!');
     }catch(e){
-      // Backend returned 404 or error — save locally
       const localId=editSId||`sc-${Date.now()}`;
       const newSc={...pl,_id:localId,isActive:true,createdAt:new Date().toISOString()};
       const updated=editSId?screens.map(s=>s._id===editSId?newSc:s):[...screens,newSc];
@@ -596,11 +602,8 @@ function AdminApp({onBack}){
   };
   const delScreen=async(id)=>{
     if(!window.confirm('Remove?'))return;
-    const updated=screens.filter(s=>s._id!==id);
-    saveSc(updated);
-    if(!id.startsWith('sc-')){
-      await axios.delete(`${API}/admin/screens/${id}`).catch(()=>{});
-    }
+    saveSc(screens.filter(s=>s._id!==id));
+    if(!id.startsWith('sc-')) await axios.delete(`${API}/admin/screens/${id}`).catch(()=>{});
     showToast('🗑 Screen removed');
   };
 
@@ -637,6 +640,40 @@ function AdminApp({onBack}){
     showToast(`✅ ${slotNumber} released`);
   };
 
+  /* ── ✅ OFFLINE PARKING BOOKING ─────────────────────────────*/
+  const doOfflineParking=async()=>{
+    const {slotNumber,username,movieName,showTiming}=offlineParkForm;
+    if(!slotNumber.trim()||!username.trim()){showToast('❌ Slot & username required');return;}
+    setOfflineParkLoading(true);
+    try{
+      await axios.post(`${API}/admin/parking/offline`,{slotNumber:slotNumber.trim(),username:username.trim(),movieName:movieName||'General',showTiming:showTiming||''});
+      saveP(parking.map(s=>s.slotNumber===slotNumber.trim()?{...s,isBooked:true,bookedBy:username.trim()}:s));
+      setOfflineParkForm(emptyOfflinePark);
+      showToast(`✅ Slot ${slotNumber} booked offline for ${username}`);
+      fetchAll();
+    }catch(e){showToast('❌ '+(e.response?.data?.error||'Offline parking failed'));}
+    setOfflineParkLoading(false);
+  };
+
+  /* ── ✅ OFFLINE SNACK ORDER ─────────────────────────────────*/
+  const offlineCartItems=Object.values(offlineCart).filter(i=>i.qty>0);
+  const offlineSnkTot=offlineCartItems.reduce((s,i)=>s+i.price*i.qty,0);
+  const doOfflineSnacks=async()=>{
+    if(!offlineSnackUser.trim()||!offlineCartItems.length){showToast('❌ Username and items required');return;}
+    setOfflineSnackLoading(true);
+    try{
+      await axios.post(`${API}/admin/snacks/offline`,{
+        username:offlineSnackUser.trim(),
+        items:offlineCartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice||0})),
+        total:offlineSnkTot,
+      });
+      setOfflineCart({});setOfflineSnackUser('');
+      showToast(`✅ Offline snack order placed! ₹${offlineSnkTot}`);
+      fetchAll();
+    }catch(e){showToast('❌ '+(e.response?.data?.error||'Offline order failed'));}
+    setOfflineSnackLoading(false);
+  };
+
   /* ── DIRECT BOOK ────────────────────────────────────────────*/
   const directBook=async()=>{
     const {username,movieName,timing,screenName,seats,amount,notes}=bForm;
@@ -658,7 +695,7 @@ function AdminApp({onBack}){
   };
 
   const BLOCK_INFO={A:{ico:'🏍',color:'#007AFF',desc:'Two-Wheeler · ₹30'},B:{ico:'🚗',color:'#34C759',desc:'Four-Wheeler · ₹60'},C:{ico:'🚙',color:'#FF9500',desc:'Premium · ₹80'},D:{ico:'♿',color:'#8E8E93',desc:'Disabled · Free'}};
-  const TABS=[['monitor','🎭 Monitor'],['screens','🖥️ Screens'],['analytics','📊 Analytics'],['bookings','🎟 Bookings'],['movies','🎬 Movies'],['snacks','🍿 Snacks'],['parking','🅿️ Parking'],['users','👥 Users'],['direct','✏️ Book']];
+  const TABS=[['monitor','🎭 Monitor'],['screens','🖥️ Screens'],['analytics','📊 Analytics'],['bookings','🎟 Bookings'],['movies','🎬 Movies'],['snacks','🍿 Snacks'],['parking','🅿️ Parking'],['offline','📋 Offline'],['users','👥 Users'],['direct','✏️ Book']];
 
   return(
     <div className="adm-shell">
@@ -690,7 +727,7 @@ function AdminApp({onBack}){
 
       <div className="adm-wrap">
         {!backendOk&&<div style={{background:'rgba(255,184,0,.1)',border:'1px solid rgba(255,184,0,.3)',borderRadius:12,padding:'10px 16px',marginBottom:14,fontSize:12,color:'#FFB800'}}>
-          ⚠️ Backend offline or not updated — screens/payments running in local mode. Redeploy <code>server.js</code> on Render to fix.
+          ⚠️ Backend offline — screens/payments running in local mode. Redeploy <code>server.js</code> on Render to fix.
         </div>}
 
         {/* MONITOR */}
@@ -730,7 +767,7 @@ function AdminApp({onBack}){
                 </div>
                 <button className="btn btn-sm" style={{background:'rgba(255,55,95,.15)',color:'var(--accent)',border:'1px solid rgba(255,55,95,.3)'}}
                   onClick={async()=>{
-                    if(!window.confirm('Reset?'))return;
+                    if(!window.confirm('Reset all bookings for this show?'))return;
                     await axios.delete(`${API}/admin/refresh/${encodeURIComponent(activeShow.mTitle)}/${encodeURIComponent(activeShow.show.time)}`).catch(()=>{});
                     setSeatMap({});showToast('🗑 Show reset');
                   }}>🗑 Reset Show</button>
@@ -743,7 +780,7 @@ function AdminApp({onBack}){
         {tab==='screens'&&(
           <div className="page">
             {!screensOnline&&<div style={{background:'rgba(255,184,0,.08)',border:'1px solid rgba(255,184,0,.2)',borderRadius:10,padding:'9px 14px',marginBottom:14,fontSize:11,color:'#FFB800'}}>
-              🖥️ Screens saved locally (server /api/screens not reachable). Changes persist in browser until backend is deployed.
+              🖥️ Screens saved locally — server not reachable. Redeploy backend to persist.
             </div>}
             <div className="adm-card">
               <div style={{color:'#fff',fontWeight:800,fontSize:15,marginBottom:14}}>{editSId?'✏️ Edit Screen':'➕ Add Screen'}</div>
@@ -770,9 +807,6 @@ function AdminApp({onBack}){
               </div>
             </div>
             <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',margin:'18px 0 10px'}}>{screens.length} screen{screens.length!==1?'s':''}</div>
-            {screens.length===0&&<div style={{textAlign:'center',color:'rgba(255,255,255,.3)',padding:40,background:'rgba(255,255,255,.03)',borderRadius:14,border:'1px dashed rgba(255,255,255,.1)'}}>
-              <div style={{fontSize:36,marginBottom:12}}>🖥️</div>No screens. Add one above.
-            </div>}
             {screens.map(sc=>{
               const color=SC_COLOR[sc.screenType]||'#007AFF';
               const badge=SC_BADGE[sc.screenType]||'🎬';
@@ -804,11 +838,13 @@ function AdminApp({onBack}){
         {tab==='analytics'&&(
           <div className="page">
             <div className="adm-stat-grid">
-              {[['₹'+(analytics?.totalRevenue?.toLocaleString()||0),'var(--green)','Total Revenue'],
-                ['₹'+(analytics?.ticketRevenue?.toLocaleString()||0),'var(--accent)','Tickets'],
+              {[
+                ['₹'+(analytics?.totalRevenue?.toLocaleString()||0),'var(--green)','Total Revenue'],
+                ['₹'+(analytics?.ticketRevenue?.toLocaleString()||0),'var(--accent)','Tickets+Admin'],
                 ['₹'+(analytics?.parkingRevenue?.toLocaleString()||0),'var(--blue)','Parking'],
                 ['₹'+(analytics?.refreshmentRevenue?.toLocaleString()||0),'#FF9500','Snacks'],
-                [(analytics?.totalBookings||0)+'','#FFB800','All Bookings'],
+                [(analytics?.totalBookings||0)+'','#FFB800','User Bookings'],
+                [(analytics?.totalAdminBookings||0)+'','var(--purple)','Admin Bookings'],
                 [analytics?.totalUsers||users.length+'','#fff','Users'],
                 [analytics?.coinsIssued||0+'','#FFB800','Coins Issued'],
                 [screens.length+'','var(--green)','Screens'],
@@ -816,7 +852,7 @@ function AdminApp({onBack}){
             </div>
             {analytics?.dailyRevenue?.length>0&&<div className="adm-card"><div style={{fontSize:13,fontWeight:700,color:'rgba(255,255,255,.6)',marginBottom:6}}>📈 7-Day Revenue</div><RevenueChart data={analytics.dailyRevenue}/></div>}
             {analytics?.movieStats?.length>0&&<>
-              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',margin:'18px 0 10px'}}>Popular Movies</div>
+              <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',margin:'18px 0 10px'}}>🏆 Popular Movies (Tickets + Admin Bookings)</div>
               {analytics.movieStats.map((m,i)=>(
                 <div key={i} className="adm-row" style={{display:'flex',justifyContent:'space-between'}}>
                   <div style={{color:'#fff',fontWeight:700}}>#{i+1} {m._id}</div>
@@ -873,14 +909,14 @@ function AdminApp({onBack}){
                 );
                 if(b._bt==='r') return(
                   <div key={i} className="adm-row" style={{display:'flex',justifyContent:'space-between',border:'1px solid rgba(255,149,0,.15)'}}>
-                    <div><div style={{color:'#fff',fontWeight:700,marginBottom:4}}>{b.username} <span className="btype-r">SNACKS</span></div>
+                    <div><div style={{color:'#fff',fontWeight:700,marginBottom:4}}>{b.username} <span className="btype-r">SNACKS</span>{b.paymentMethod==='offline'&&<span className="offline-badge" style={{marginLeft:6}}>OFFLINE</span>}</div>
                     <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>{b.items?.map(it=>`${it.name} ×${it.qty}`).join(', ')}</div></div>
                     <div style={{background:'rgba(255,149,0,.15)',color:'#FF9500',borderRadius:7,padding:'3px 10px',fontSize:11,fontWeight:700}}>₹{b.total}</div>
                   </div>
                 );
                 if(b._bt==='p') return(
                   <div key={i} className="adm-row" style={{display:'flex',justifyContent:'space-between',border:'1px solid rgba(0,122,255,.15)'}}>
-                    <div><div style={{color:'#fff',fontWeight:700,marginBottom:4}}>Slot {b.slotNumber} <span className="btype-p">PARKING</span></div>
+                    <div><div style={{color:'#fff',fontWeight:700,marginBottom:4}}>Slot {b.slotNumber} <span className="btype-p">PARKING</span>{b.paymentMethod==='offline'&&<span className="offline-badge" style={{marginLeft:6}}>OFFLINE</span>}</div>
                     <div style={{color:'rgba(255,255,255,.4)',fontSize:12}}>👤 {b.username} · {b.slotType}</div></div>
                     <div style={{background:'rgba(0,122,255,.15)',color:'var(--blue)',borderRadius:7,padding:'3px 10px',fontSize:11,fontWeight:700}}>₹{b.price}</div>
                   </div>
@@ -946,6 +982,7 @@ function AdminApp({onBack}){
                   <button className="chip chip-blue" onClick={()=>{
                     setEditMId(m._id);setImgPrev(m.img||'');setMForm({...m,rating:String(m.rating||8)});
                     setSchedule(m.shows?.length>0?m.shows.map(s=>({time:s.time,screenId:s.screenId||'',screenName:s.screenName||'',screenType:s.screenType||'Standard',rows:s.rows||8,seatsPerRow:s.seatsPerRow||10,capacity:s.capacity||80})):(m.timings||[]).map(t=>({time:t,screenId:'',screenName:'',rows:8,seatsPerRow:10,capacity:80})));
+                    window.scrollTo({top:0,behavior:'smooth'});
                   }}>✏️</button>
                   <button className="chip" style={{background:'rgba(255,55,95,.15)',color:'var(--accent)'}} onClick={()=>delMovie(m._id)}>🗑</button>
                 </div>
@@ -965,9 +1002,10 @@ function AdminApp({onBack}){
                 <div><label className="adm-lbl">Category</label><input className="adm-inp" placeholder="Snacks/Drinks/Combos" value={snForm.category||''} onChange={e=>setSnForm(p=>({...p,category:e.target.value}))}/></div>
                 <div><label className="adm-lbl">Price (₹)</label><input className="adm-inp" type="number" placeholder="150" value={snForm.price||''} onChange={e=>setSnForm(p=>({...p,price:e.target.value}))}/></div>
                 <div><label className="adm-lbl">Coin Price 🪙</label><input className="adm-inp" type="number" placeholder="75" value={snForm.coinPrice||''} onChange={e=>setSnForm(p=>({...p,coinPrice:e.target.value}))}/></div>
+                {/* ✅ Image URL field for snacks */}
                 <div style={{gridColumn:'1/-1'}}>
                   <label className="adm-lbl">🖼 Image URL (optional)</label>
-                  <input className="adm-inp" placeholder="https://example.com/img.jpg" value={snForm.img||''} onChange={e=>{setSnForm(p=>({...p,img:e.target.value}));setSnImgPrev(e.target.value);}}/>
+                  <input className="adm-inp" placeholder="https://example.com/popcorn.jpg" value={snForm.img||''} onChange={e=>{setSnForm(p=>({...p,img:e.target.value}));setSnImgPrev(e.target.value);}}/>
                   {snImgPrev&&<img src={snImgPrev} alt="prev" style={{width:60,height:60,objectFit:'cover',borderRadius:10,border:'1px solid rgba(255,255,255,.15)',marginTop:8}} onError={e=>e.target.style.display='none'}/>}
                 </div>
               </div>
@@ -979,8 +1017,10 @@ function AdminApp({onBack}){
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(165px,1fr))',gap:11}}>
               {snacks.map(s=>(
                 <div key={s._id} style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.08)',borderRadius:13,overflow:'hidden'}}>
-                  {s.img?<img src={s.img} alt={s.name} style={{width:'100%',height:80,objectFit:'cover',display:'block'}} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>:null}
-                  <div style={{display:s.img?'none':'flex',height:80,alignItems:'center',justifyContent:'center',fontSize:30,background:'rgba(255,255,255,.04)'}}>{s.emoji||'🍿'}</div>
+                  {s.img
+                    ?<img src={s.img} alt={s.name} style={{width:'100%',height:80,objectFit:'cover',display:'block'}} onError={e=>{e.target.style.display='none';}}/>
+                    :<div style={{height:80,display:'flex',alignItems:'center',justifyContent:'center',fontSize:30,background:'rgba(255,255,255,.04)'}}>{s.emoji||'🍿'}</div>
+                  }
                   <div style={{padding:14}}>
                     <div style={{color:'#fff',fontWeight:700,fontSize:13}}>{s.name}</div>
                     <div style={{color:'var(--green)',fontSize:12,fontWeight:700,marginTop:2}}>₹{s.price} · 🪙{s.coinPrice}</div>
@@ -1031,6 +1071,86 @@ function AdminApp({onBack}){
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ✅ NEW: OFFLINE BOOKINGS TAB */}
+        {tab==='offline'&&(
+          <div className="page">
+            <div style={{color:'#fff',fontWeight:900,fontSize:20,marginBottom:4}}>📋 Offline Bookings</div>
+            <div style={{color:'rgba(255,255,255,.4)',fontSize:12,marginBottom:20}}>Walk-in cash/manual booking — no payment gateway required.</div>
+
+            {/* OFFLINE PARKING */}
+            <div className="offline-panel">
+              <div className="offline-panel-title">🅿️ Offline Parking Booking</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9}}>
+                <div>
+                  <label className="adm-lbl">Slot Number *</label>
+                  <select className="adm-sel" value={offlineParkForm.slotNumber} onChange={e=>setOfflineParkForm(p=>({...p,slotNumber:e.target.value}))}>
+                    <option value="">Select slot…</option>
+                    {parking.filter(s=>!s.isBooked&&s.slotType!=='Disabled').map(s=>(
+                      <option key={s.slotNumber} value={s.slotNumber}>{s.slotNumber} — {s.slotType} (₹{s.price})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="adm-lbl">Customer Username *</label>
+                  <input className="adm-inp" placeholder="Username" value={offlineParkForm.username} onChange={e=>setOfflineParkForm(p=>({...p,username:e.target.value}))}/>
+                </div>
+                <div>
+                  <label className="adm-lbl">Movie Name</label>
+                  <select className="adm-sel" value={offlineParkForm.movieName} onChange={e=>setOfflineParkForm(p=>({...p,movieName:e.target.value}))}>
+                    <option value="">General</option>
+                    {movies.map(m=><option key={m._id} value={m.title}>{m.title}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="adm-lbl">Show Timing</label>
+                  <input className="adm-inp" placeholder="e.g. 6:00 PM" value={offlineParkForm.showTiming} onChange={e=>setOfflineParkForm(p=>({...p,showTiming:e.target.value}))}/>
+                </div>
+              </div>
+              <button className="btn btn-sm" style={{background:'rgba(255,184,0,.2)',color:'#FFB800',border:'1px solid rgba(255,184,0,.3)'}} disabled={offlineParkLoading||!offlineParkForm.slotNumber||!offlineParkForm.username} onClick={doOfflineParking}>
+                {offlineParkLoading?<Spin/>:'📋 Book Offline Parking'}
+              </button>
+            </div>
+
+            {/* OFFLINE SNACK ORDER */}
+            <div className="offline-panel">
+              <div className="offline-panel-title">🍿 Offline Snack Order</div>
+              <label className="adm-lbl">Customer Username *</label>
+              <input className="adm-inp" placeholder="Username" value={offlineSnackUser} onChange={e=>setOfflineSnackUser(e.target.value)}/>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:9,marginTop:10,marginBottom:14}}>
+                {snacks.map(s=>{
+                  const qty=offlineCart[s._id]?.qty||0;
+                  return(
+                    <div key={s._id} style={{background:'rgba(255,255,255,.04)',border:`2px solid ${qty>0?'rgba(255,184,0,.4)':'rgba(255,255,255,.08)'}`,borderRadius:12,padding:10,cursor:'pointer',position:'relative',transition:'all .18s'}}
+                      onClick={()=>setOfflineCart(p=>({...p,[s._id]:{...s,qty:(p[s._id]?.qty||0)+1}}))}>
+                      {qty>0&&<div style={{position:'absolute',top:5,right:5,background:'#FFB800',color:'#000',borderRadius:20,padding:'1px 6px',fontSize:10,fontWeight:800}}>×{qty}</div>}
+                      <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
+                      <div style={{color:'#fff',fontSize:11,fontWeight:700}}>{s.name}</div>
+                      <div style={{color:'var(--green)',fontSize:11,marginTop:2}}>₹{s.price}</div>
+                      {qty>0&&<button style={{position:'absolute',bottom:5,right:5,background:'rgba(255,55,95,.3)',border:'none',color:'var(--accent)',borderRadius:5,cursor:'pointer',fontSize:11,padding:'1px 5px'}}
+                        onClick={e=>{e.stopPropagation();setOfflineCart(p=>{const n={...p};if(n[s._id]?.qty>1){n[s._id]={...n[s._id],qty:n[s._id].qty-1};}else{delete n[s._id];}return n;});}}>−</button>}
+                    </div>
+                  );
+                })}
+              </div>
+              {offlineCartItems.length>0&&(
+                <div style={{background:'rgba(255,255,255,.05)',borderRadius:11,padding:'12px 16px',marginBottom:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <div>
+                    <div style={{color:'#fff',fontWeight:700,fontSize:13}}>{offlineCartItems.length} item type(s) · {offlineCartItems.reduce((s,i)=>s+i.qty,0)} total</div>
+                    <div style={{color:'rgba(255,255,255,.4)',fontSize:11,marginTop:2}}>{offlineCartItems.map(i=>`${i.name}×${i.qty}`).join(', ')}</div>
+                  </div>
+                  <div style={{color:'var(--green)',fontWeight:800,fontSize:16}}>₹{offlineSnkTot}</div>
+                </div>
+              )}
+              <div style={{display:'flex',gap:9}}>
+                <button className="btn btn-sm" style={{background:'rgba(255,184,0,.2)',color:'#FFB800',border:'1px solid rgba(255,184,0,.3)'}} disabled={offlineSnackLoading||!offlineSnackUser||!offlineCartItems.length} onClick={doOfflineSnacks}>
+                  {offlineSnackLoading?<Spin/>:`🛒 Place Offline Order${offlineSnkTot>0?` · ₹${offlineSnkTot}`:''}`}
+                </button>
+                {offlineCartItems.length>0&&<button className="chip chip-grey" onClick={()=>setOfflineCart({})}>Clear Cart</button>}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1137,7 +1257,8 @@ function UserApp({onAdmin}){
 
   useEffect(()=>{
     axios.get(`${API}/movies`).then(r=>{if(r.data?.length){const m=mergeArr(r.data,DEFAULT_MOVIES);setMovies(m);LS.set('ct_movies',m);}}).catch(()=>{});
-    axios.get(`${API}/snacks`).then(r=>{if(r.data?.length){const m=[...DEFAULT_SNACKS];r.data.forEach(x=>{if(!m.find(s=>s.name===x.name))m.push(x);});setSnacks(m);LS.set('ct_admin_snacks',m);}}).catch(()=>{});
+    // ✅ Snacks with img field now properly synced
+    axios.get(`${API}/snacks`).then(r=>{if(r.data?.length){const m=[...DEFAULT_SNACKS];r.data.forEach(x=>{const idx=m.findIndex(s=>s.name===x.name);if(idx>=0)m[idx]={...m[idx],...x};else m.push(x);});setSnacks(m);LS.set('ct_admin_snacks',m);}}).catch(()=>{});
     axios.get(`${API}/parking`).then(r=>{if(r.data?.length){setParkSlots(r.data);LS.set('ct_admin_parking',r.data);}}).catch(()=>{});
   },[]);
 
@@ -1208,10 +1329,11 @@ function UserApp({onAdmin}){
     await refreshCoins(user);
   };
 
-  /* ── RAZORPAY — REAL INTEGRATION ────────────────────────────────────────────
-     Always opens the actual Razorpay checkout modal.
-     Gets orderId from backend; if backend fails, opens modal WITHOUT order_id
-     (Razorpay allows this in test mode — the modal still opens fully). */
+  /* ══════════════════════════════════════════════════════════
+     ✅ FIXED RAZORPAY: keyId ALWAYS comes from backend first.
+     RZP_KEY_FALLBACK is only used if backend call completely fails.
+     This prevents the 401 "key mismatch" error.
+  ══════════════════════════════════════════════════════════ */
   const loadRzp=()=>new Promise(res=>{
     if(window.Razorpay){res(true);return;}
     const s=document.createElement('script');
@@ -1225,17 +1347,18 @@ function UserApp({onAdmin}){
   const openRzp=useCallback(async({amount,description,onSuccess,onFail})=>{
     if(!amount||amount<=0){showToast('❌ Invalid amount');onFail?.();return;}
 
-    // Step 1: Load Razorpay checkout.js script
     const scriptOk=await loadRzp();
     if(!scriptOk||!window.Razorpay){
-      showToast('❌ Could not load Razorpay. Check internet connection.');
+      showToast('❌ Could not load Razorpay. Check your internet connection.');
       onFail?.();
       return;
     }
 
-    // Step 2: Try to get a real order_id from backend
+    // ✅ CRITICAL FIX: Always fetch keyId from backend. Never use hardcoded key as primary.
     let orderId=null;
-    let rzpKey=RZP_KEY_FALLBACK; // always use test key as default
+    let rzpKey=RZP_KEY_FALLBACK; // Last resort only — backend always overrides this
+    let isSimulated=false;
+
     try{
       const r=await axios.post(`${API}/payment/create-order`,{
         amount,
@@ -1243,22 +1366,30 @@ function UserApp({onAdmin}){
         notes:{description},
       });
       const d=r.data;
-      // Only use real orderId if it's NOT simulated
+
+      // ✅ ALWAYS use the key returned by backend — it's authoritative
+      if(d.keyId){
+        rzpKey=d.keyId;
+        console.log('✅ Using backend keyId:', rzpKey.slice(0,20)+'...');
+      }else{
+        console.warn('⚠️ Backend did not return keyId, using fallback:', rzpKey);
+      }
+
       if(d.orderId&&!d.simulated&&!d.orderId.startsWith('order_SIM_')){
         orderId=d.orderId;
+        console.log('✅ Using real Razorpay orderId:', orderId);
+      }else{
+        isSimulated=true;
+        console.log('ℹ️ Simulated order — opening Razorpay without order_id');
       }
-      if(d.keyId) rzpKey=d.keyId;
-      console.log('✅ Backend order:',d.orderId,'simulated:',d.simulated);
     }catch(e){
-      console.warn('⚠️ Backend create-order failed, opening Razorpay without order_id:',e.message);
-      // This is fine — Razorpay test mode works without order_id
+      console.warn('⚠️ Backend create-order failed, proceeding with fallback key. Error:', e.message);
+      // rzpKey stays as RZP_KEY_FALLBACK, orderId stays null
     }
 
-    // Step 3: Build Razorpay options
-    // IMPORTANT: In test mode, Razorpay opens even without order_id
     const opts={
-      key: rzpKey,                        // rzp_test_SmNcizKVCBNmvb
-      amount: Math.round(amount*100),     // in paise
+      key: rzpKey,
+      amount: Math.round(amount*100),
       currency: 'INR',
       name: 'Cine Time',
       description: description,
@@ -1269,24 +1400,24 @@ function UserApp({onAdmin}){
         contact: '9999999999',
       },
       theme:{ color:'#FF375F' },
-      // Only add order_id if we got one from backend
-      ...(orderId ? { order_id: orderId } : {}),
+      // ✅ Only attach order_id if we have a real (non-simulated) one
+      ...(orderId&&!isSimulated ? { order_id: orderId } : {}),
       handler: async(response)=>{
-        // Payment succeeded — verify if we have real IDs, then call onSuccess
-        console.log('✅ Razorpay payment success:',response);
+        console.log('✅ Razorpay payment success:', response);
+        // Verify if we have real order/payment IDs
         if(response.razorpay_order_id&&response.razorpay_payment_id&&response.razorpay_signature){
           try{
             await axios.post(`${API}/payment/verify`,{
-              razorpay_order_id:response.razorpay_order_id,
-              razorpay_payment_id:response.razorpay_payment_id,
-              razorpay_signature:response.razorpay_signature,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
             });
-          }catch(e){console.warn('Verify non-fatal:',e.message);}
+          }catch(e){console.warn('Verify non-fatal:', e.message);}
         }
         onSuccess({
-          orderId:response.razorpay_order_id||orderId||`order_${Date.now()}`,
-          paymentId:response.razorpay_payment_id||`pay_${Date.now()}`,
-          signature:response.razorpay_signature||'',
+          orderId:  response.razorpay_order_id  || orderId || `order_${Date.now()}`,
+          paymentId:response.razorpay_payment_id || `pay_${Date.now()}`,
+          signature:response.razorpay_signature  || '',
         });
       },
       modal:{
@@ -1300,17 +1431,16 @@ function UserApp({onAdmin}){
       },
     };
 
-    // Step 4: Open the modal
     try{
       const rzp=new window.Razorpay(opts);
       rzp.on('payment.failed',(resp)=>{
-        console.error('Payment failed:',resp.error);
+        console.error('Payment failed:', resp.error);
         showToast('❌ Payment failed: '+(resp.error?.description||'Try again'));
         onFail?.();
       });
       rzp.open();
     }catch(e){
-      console.error('Razorpay.open threw:',e);
+      console.error('Razorpay.open threw:', e);
       showToast('❌ Razorpay error: '+e.message);
       onFail?.();
     }
@@ -1326,30 +1456,49 @@ function UserApp({onAdmin}){
         coinsUsed:method==='coins'?coinsNeed:0,
         paymentMethod:method,razorpayOrderId:orderId||null,razorpayPaymentId:paymentId||null,
       });
-      // Always show e-ticket modal
-      setETicket({qr:r.data.eTicketQR||null,movieName:movie.title,timing:selShow.time,screenName:selShow.screenName||'',seats:sel,amount:method==='coins'?0:tickTot,ticketId:r.data.ticketId});
+      // ✅ Show E-ticket modal immediately after booking
+      setETicket({
+        qr:r.data.eTicketQR||null,
+        movieName:movie.title,
+        timing:selShow.time,
+        screenName:selShow.screenName||'',
+        seats:sel,
+        amount:method==='coins'?0:tickTot,
+        ticketId:r.data.ticketId,
+      });
       const nb=r.data.newCoinBalance??await refreshCoins(user);
       upCoins(nb);
       showToast(`✅ Booked!${(r.data.coinsEarned||0)>0?` +${r.data.coinsEarned} 🪙`:''}`);
+      // Also order snacks if in cart
       if(cartItems.length>0&&method==='razorpay'){
         try{
-          const rr=await axios.post(`${API}/refreshments/order`,{username:user,movieName:movie.title,timing:selShow.time,items:cartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice})),total:snkTot,paymentMethod:'razorpay',razorpayOrderId:orderId,razorpayPaymentId:paymentId});
+          const rr=await axios.post(`${API}/refreshments/order`,{
+            username:user,movieName:movie.title,timing:selShow.time,
+            items:cartItems.map(i=>({name:i.name,qty:i.qty,price:i.price,coinPrice:i.coinPrice})),
+            total:snkTot,paymentMethod:'razorpay',
+            razorpayOrderId:orderId,razorpayPaymentId:paymentId,
+          });
           const nb2=rr.data.newCoinBalance??await refreshCoins(user);upCoins(nb2);
-        }catch(e){console.warn('Snack order warn:',e.message);}
+        }catch(e){console.warn('Snack order warn:', e.message);}
       }
       setSel([]);setCart({});setPayM('razorpay');
     };
+
     if(method==='razorpay'){
       setRzpLoad(true);
       await openRzp({
-        amount:tickTot+snkTot,
-        description:`${movie.title} · ${sel.length} seat(s) · ${selShow.time}`,
-        onSuccess:async({orderId,paymentId})=>{try{await doBook(orderId,paymentId);}catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}},
-        onFail:()=>setRzpLoad(false),
+        amount: tickTot+snkTot,
+        description: `${movie.title} · ${sel.length} seat(s) · ${selShow.time}`,
+        onSuccess: async({orderId,paymentId})=>{
+          try{await doBook(orderId,paymentId);}
+          catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
+        },
+        onFail: ()=>setRzpLoad(false),
       });
       setRzpLoad(false);
     }else{
-      try{await doBook(null,null);}catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
+      try{await doBook(null,null);}
+      catch(e){showToast('❌ '+(e.response?.data?.error||'Booking failed'));}
     }
   };
 
@@ -1359,10 +1508,16 @@ function UserApp({onAdmin}){
     try{
       if(method==='razorpay'&&slot.price>0){
         await openRzp({
-          amount:slot.price,description:`Parking Slot ${slot.slotNumber} · ${slot.slotType}`,
+          amount:slot.price,
+          description:`Parking Slot ${slot.slotNumber} · ${slot.slotType}`,
           onSuccess:async({orderId,paymentId})=>{
             try{
-              const r=await axios.post(`${API}/parking/book`,{slotNumber:slot.slotNumber,username:user,showTiming:selShow?.time||'',movieName:movie?.title||'General',paymentMethod:'razorpay',coinsUsed:0,razorpayOrderId:orderId,razorpayPaymentId:paymentId});
+              const r=await axios.post(`${API}/parking/book`,{
+                slotNumber:slot.slotNumber,username:user,
+                showTiming:selShow?.time||'',movieName:movie?.title||'General',
+                paymentMethod:'razorpay',coinsUsed:0,
+                razorpayOrderId:orderId,razorpayPaymentId:paymentId,
+              });
               const nb=r.data.newCoinBalance??await refreshCoins(user);upCoins(nb);
               setParkSlots(p=>p.map(s=>s.slotNumber===slot.slotNumber?{...s,isBooked:true,bookedBy:user}:s));
               setSelSlot(null);showToast(`✅ Slot ${slot.slotNumber}! +${r.data.coinsEarned||0} 🪙`);
@@ -1465,6 +1620,7 @@ function UserApp({onAdmin}){
   /* GALLERY */
   if(page==='gallery')return(
     <><style>{G}</style><Toast msg={toast}/>
+      {/* ✅ E-Ticket modal shown after booking from gallery too */}
       <ETicket data={eTicket} onClose={()=>{setETicket(null);setPage('gallery');}} email={email}/>
       <NavBar/>
       <div className="shell page">
@@ -1584,6 +1740,8 @@ function UserApp({onAdmin}){
   /* PAYMENT */
   if(page==='pay')return(
     <><style>{G}</style><Toast msg={toast}/>
+      {/* ✅ E-Ticket shown after successful payment */}
+      <ETicket data={eTicket} onClose={()=>{setETicket(null);setPage('gallery');}} email={email}/>
       <div className="pay-wrap">
         <div className="pay-card pop">
           <div style={{width:72,height:72,borderRadius:22,background:payM==='coins'?'linear-gradient(145deg,#FFB800,#FF9500)':'linear-gradient(145deg,#2d6adb,#1a4fb5)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:36,margin:'0 auto 20px'}}>
@@ -1632,7 +1790,7 @@ function UserApp({onAdmin}){
       <Chatbot movies={movies}/></>
   );
 
-  /* STORE */
+  /* STORE — ✅ Now shows snack images from backend */
   if(page==='store')return(
     <><style>{G}</style><Toast msg={toast}/>
       <nav className="nav">
@@ -1650,7 +1808,11 @@ function UserApp({onAdmin}){
             return(
               <div key={item._id} className="menu-card" onClick={()=>addCart(item)}>
                 {qty>0&&<div className="qty-badge">×{qty}</div>}
-                {item.img?<img src={item.img} className="menu-img" alt={item.name} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>:null}
+                {/* ✅ Shows actual image from backend if available, else falls back to emoji */}
+                {item.img
+                  ?<img src={item.img} className="menu-img" alt={item.name} onError={e=>{e.target.style.display='none';e.target.nextSibling.style.display='flex';}}/>
+                  :null
+                }
                 <div className="menu-emo" style={{display:item.img?'none':'flex'}}>{item.emoji}</div>
                 <div className="menu-body">
                   <div className="menu-name">{item.name}</div>
@@ -1722,12 +1884,12 @@ function UserApp({onAdmin}){
               </div>
               <div className="park-grid">
                 {slots.map(slot=>{
-                  const own=slot.bookedBy===user;const isSel=selSlot===slot.slotNumber;
+                  const isSel=selSlot===slot.slotNumber;
                   let cls='p-free';if(slot.isBooked)cls='p-booked';else if(slot.slotType==='Disabled')cls='p-dis';else if(isSel)cls='p-sel';
                   return(
                     <div key={slot.slotNumber} className={`park-slot ${cls}`} onClick={()=>{if(slot.isBooked)return;setSelSlot(s=>s===slot.slotNumber?null:slot.slotNumber);}}>
                       <div className="p-num" style={{color:isSel?'#fff':undefined}}>{slot.slotNumber}</div>
-                      <div className="p-sta" style={{color:slot.isBooked?'var(--accent)':isSel?'rgba(255,255,255,.85)':slot.slotType==='Disabled'?'var(--t4)':'var(--green)'}}>{slot.isBooked?(own?'YOURS':'FULL'):slot.slotType==='Disabled'?'RESERVED':isSel?'SELECTED':'FREE'}</div>
+                      <div className="p-sta" style={{color:slot.isBooked?'var(--accent)':isSel?'rgba(255,255,255,.85)':slot.slotType==='Disabled'?'var(--t4)':'var(--green)'}}>{slot.isBooked?'FULL':slot.slotType==='Disabled'?'RESERVED':isSel?'SELECTED':'FREE'}</div>
                     </div>
                   );
                 })}
@@ -1766,6 +1928,7 @@ function UserApp({onAdmin}){
                     </div>
                     <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:7}}>
                       <div className="hist-badge">{new Date(h.date).toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</div>
+                      {/* ✅ Tap QR to show full e-ticket modal */}
                       {h.eTicketQR&&<div style={{cursor:'pointer'}} onClick={()=>setETicket({qr:h.eTicketQR,movieName:h.movieName,timing:h.timing,screenName:h.screenName,seats:h.selectedSeats,amount:h.amount})}>
                         <img src={h.eTicketQR} alt="QR" style={{width:52,borderRadius:8,border:'2px solid var(--accent-bg)'}}/>
                         <div style={{fontSize:9,color:'var(--accent)',fontWeight:700,textAlign:'center',marginTop:2}}>Tap QR</div>
@@ -1819,6 +1982,7 @@ function UserApp({onAdmin}){
             ))
         )}
       </div>
+      {/* ✅ E-Ticket modal accessible from history */}
       {eTicket&&<ETicket data={eTicket} onClose={()=>setETicket(null)} email={email}/>}
       <MobNav/><Chatbot movies={movies}/></>
   );

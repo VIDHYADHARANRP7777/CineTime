@@ -1,34 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const qrcode = require('qrcode');
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
 const app = express();
 app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE','OPTIONS'], credentials: true }));
 app.use(express.json({ limit: '10mb' }));
-
-// ── RAZORPAY ──────────────────────────────────────────────────────────────────
-// ✅ Updated credentials — read from env first, then fallback to hardcoded
-const RZP_KEY_ID     = process.env.RAZORPAY_KEY_ID     || 'rzp_test_Soiy52I6HkMaEN';
-const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'dlNQKRcxwDzqNd6aKqF7AyOv';
-
-console.log('🔑 Razorpay Key:', RZP_KEY_ID.slice(0,20)+'...');
-console.log('🔑 Secret length:', RZP_KEY_SECRET.length);
-
-let razorpay = null;
-try {
-  if (RZP_KEY_ID && RZP_KEY_SECRET && RZP_KEY_ID.startsWith('rzp_')) {
-    razorpay = new Razorpay({ key_id: RZP_KEY_ID, key_secret: RZP_KEY_SECRET });
-    console.log('✅ Razorpay initialized:', RZP_KEY_ID.slice(0,16)+'...');
-  } else {
-    console.warn('⚠️  Razorpay keys invalid — will use simulated mode');
-  }
-} catch(e) {
-  console.error('❌ Razorpay init error:', e.message);
-}
 
 // ── MONGODB ───────────────────────────────────────────────────────────────────
 const mongoURI = process.env.MONGO_URI ||
@@ -39,11 +19,14 @@ mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 20000 })
 
 // ── SCHEMAS ───────────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema({
+  uuid:      { type: String, default: () => uuidv4(), unique: true },
   username:  { type: String, required: true, unique: true },
   password:  { type: String, required: true },
-  email: String, phone: String,
+  email:     String,
+  phone:     String,
   role:      { type: String, default: 'user' },
   cineCoins: { type: Number, default: 0 },
+  wallet:    { type: Number, default: 0 },  // refund wallet
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -53,16 +36,18 @@ const screenSchema = new mongoose.Schema({
   seatsPerRow: { type: Number, default: 10 },
   capacity:    { type: Number, default: 80 },
   screenType:  { type: String, default: 'Standard' },
+  basePrice:   { type: Number, default: 150 },
   isActive:    { type: Boolean, default: true },
   createdAt:   { type: Date, default: Date.now },
 });
 
 const movieSchema = new mongoose.Schema({
-  title:    { type: String, required: true },
-  genre:    String,
-  language: { type: String, default: 'Tamil' },
-  duration: String,
-  rating:   { type: Number, default: 8.0 },
+  title:       { type: String, required: true },
+  genre:       String,
+  language:    { type: String, default: 'Tamil' },
+  duration:    String,
+  rating:      { type: Number, default: 8.0 },
+  isUpcoming:  { type: Boolean, default: false },
   shows: [{
     time:        String,
     screenId:    String,
@@ -72,7 +57,7 @@ const movieSchema = new mongoose.Schema({
     seatsPerRow: { type: Number, default: 10 },
     capacity:    { type: Number, default: 80 },
   }],
-  timings:  [String],
+  timings:     [String],
   pricing: {
     morning:   { type: Number, default: 120 },
     afternoon: { type: Number, default: 150 },
@@ -83,6 +68,21 @@ const movieSchema = new mongoose.Schema({
   description: String,
   isActive:    { type: Boolean, default: true },
   createdAt:   { type: Date, default: Date.now },
+});
+
+const pastMovieSchema = new mongoose.Schema({
+  title:          String,
+  genre:          String,
+  language:       String,
+  duration:       String,
+  rating:         Number,
+  pricing:        Object,
+  img:            String,
+  description:    String,
+  totalTickets:   { type: Number, default: 0 },
+  totalRevenue:   { type: Number, default: 0 },
+  archivedAt:     { type: Date, default: Date.now },
+  originalId:     String,
 });
 
 const snackSchema = new mongoose.Schema({
@@ -96,18 +96,8 @@ const snackSchema = new mongoose.Schema({
   createdAt:   { type: Date, default: Date.now },
 });
 
-const parkingSchema = new mongoose.Schema({
-  slotNumber:  { type: String, required: true, unique: true },
-  block:       { type: String, default: 'A' },
-  slotType:    { type: String, enum: ['Two-Wheeler','Four-Wheeler','Disabled'], default: 'Two-Wheeler' },
-  price:       { type: Number, default: 30 },
-  coinPrice:   { type: Number, default: 15 },
-  isBooked:    { type: Boolean, default: false },
-  bookedBy:    { type: String, default: null },
-  bookingDate: Date, showTiming: String, movieName: String,
-});
-
 const ticketSchema = new mongoose.Schema({
+  userUUID:          { type: String, required: true },
   username:          String,
   movieName:         String,
   timing:            String,
@@ -118,30 +108,33 @@ const ticketSchema = new mongoose.Schema({
   amount:            { type: Number, default: 0 },
   coinsUsed:         { type: Number, default: 0 },
   coinsEarned:       { type: Number, default: 0 },
-  paymentMethod:     { type: String, default: 'razorpay' },
-  razorpayOrderId:   String,
-  razorpayPaymentId: String,
-  status:            { type: String, default: 'confirmed' },
+  paymentMethod:     { type: String, default: 'simulated' },
+  simPaymentId:      String,
+  isUpcoming:        { type: Boolean, default: false },
+  status:            { type: String, default: 'confirmed', enum: ['confirmed','cancelled'] },
+  cancelledAt:       Date,
+  refundAmount:      { type: Number, default: 0 },
   eTicketQR:         String,
   date:              { type: Date, default: Date.now },
 });
 
 const refreshmentOrderSchema = new mongoose.Schema({
-  username:          String,
-  movieName:         String,
-  timing:            String,
-  items:             [{ name: String, qty: Number, price: Number, coinPrice: Number }],
-  total:             { type: Number, default: 0 },
-  coinsUsed:         { type: Number, default: 0 },
-  coinsEarned:       { type: Number, default: 0 },
-  paymentMethod:     { type: String, default: 'razorpay' },
-  razorpayOrderId:   String,
-  razorpayPaymentId: String,
-  status:            { type: String, default: 'confirmed' },
-  date:              { type: Date, default: Date.now },
+  userUUID:        { type: String, required: true },
+  username:        String,
+  movieName:       String,
+  timing:          String,
+  items:           [{ name: String, qty: Number, price: Number, coinPrice: Number }],
+  total:           { type: Number, default: 0 },
+  coinsUsed:       { type: Number, default: 0 },
+  coinsEarned:     { type: Number, default: 0 },
+  paymentMethod:   { type: String, default: 'simulated' },
+  simPaymentId:    String,
+  status:          { type: String, default: 'confirmed' },
+  date:            { type: Date, default: Date.now },
 });
 
 const adminBookingSchema = new mongoose.Schema({
+  userUUID:      String,
   username:      String,
   movieName:     String,
   timing:        String,
@@ -152,43 +145,32 @@ const adminBookingSchema = new mongoose.Schema({
   amount:        { type: Number, default: 0 },
   notes:         String,
   bookedBy:      { type: String, default: 'admin' },
+  isUpcoming:    { type: Boolean, default: false },
   status:        { type: String, default: 'confirmed' },
   eTicketQR:     String,
   date:          { type: Date, default: Date.now },
 });
 
-const parkingBookingSchema = new mongoose.Schema({
-  username:          String,
-  slotNumber:        String,
-  block:             String,
-  slotType:          String,
-  price:             { type: Number, default: 0 },
-  coinPrice:         { type: Number, default: 0 },
-  coinsUsed:         { type: Number, default: 0 },
-  coinsEarned:       { type: Number, default: 0 },
-  paymentMethod:     { type: String, default: 'razorpay' },
-  razorpayOrderId:   { type: String, default: null },
-  razorpayPaymentId: { type: String, default: null },
-  movieName:         String,
-  showTiming:        String,
-  status:            { type: String, default: 'confirmed' },
-  date:              { type: Date, default: Date.now },
-});
-
 const Screen           = mongoose.model('Screen',            screenSchema);
 const User             = mongoose.model('User',              userSchema);
 const Movie            = mongoose.model('Movie',             movieSchema);
+const PastMovie        = mongoose.model('PastMovie',         pastMovieSchema);
 const Snack            = mongoose.model('Snack',             snackSchema);
-const ParkingSlot      = mongoose.model('ParkingSlot',       parkingSchema);
 const Ticket           = mongoose.model('Ticket',            ticketSchema);
 const RefreshmentOrder = mongoose.model('RefreshmentOrder',  refreshmentOrderSchema);
 const AdminBooking     = mongoose.model('AdminBooking',      adminBookingSchema);
-const ParkingBooking   = mongoose.model('ParkingBooking',    parkingBookingSchema);
 
-// ── HELPER ────────────────────────────────────────────────────────────────────
-async function getCoins(username) {
-  const u = await User.findOne({ username });
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+async function getCoins(uuid) {
+  const u = await User.findOne({ uuid });
   return u?.cineCoins || 0;
+}
+async function getWallet(uuid) {
+  const u = await User.findOne({ uuid });
+  return u?.wallet || 0;
+}
+function simPayId() {
+  return `SIM_PAY_${Date.now()}_${Math.random().toString(36).slice(2,8).toUpperCase()}`;
 }
 
 // ── SEED ──────────────────────────────────────────────────────────────────────
@@ -197,9 +179,9 @@ async function seedDefaults() {
     let screens = await Screen.find({ isActive: true });
     if (!screens.length) {
       screens = await Screen.insertMany([
-        { name:'Screen 1',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Standard' },
-        { name:'Screen 2',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Premium'  },
-        { name:'IMAX Hall', rows:10, seatsPerRow:12, capacity:120, screenType:'IMAX'     },
+        { name:'Screen 1',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Standard', basePrice:150 },
+        { name:'Screen 2',  rows:8,  seatsPerRow:10, capacity:80,  screenType:'Premium',  basePrice:180 },
+        { name:'IMAX Hall', rows:10, seatsPerRow:12, capacity:120, screenType:'IMAX',     basePrice:220 },
       ]);
       console.log('🖥️  Screens seeded');
     }
@@ -223,7 +205,7 @@ async function seedDefaults() {
         { title:'Oppenheimer', genre:'Biography/Drama', language:'English', duration:'3h 0m', rating:8.9,
           shows:[mk('11:00 AM',s3),mk('3:00 PM',s1),mk('7:00 PM',s2)],
           timings:['11:00 AM','3:00 PM','7:00 PM'],
-          pricing:{morning:120,afternoon:150,evening:180,night:200},
+          pricing:{morning:130,afternoon:160,evening:190,night:210},
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Oppenheimer_%28film%29.jpg/220px-Oppenheimer_%28film%29.jpg',
           description:'The story of J. Robert Oppenheimer and the Manhattan Project.' },
         { title:'Jawan', genre:'Action/Drama', language:'Hindi', duration:'2h 49m', rating:7.5,
@@ -232,43 +214,37 @@ async function seedDefaults() {
           pricing:{morning:120,afternoon:150,evening:180,night:200},
           img:'https://upload.wikimedia.org/wikipedia/en/thumb/7/7e/Jawan_film_poster.jpg/220px-Jawan_film_poster.jpg',
           description:'A prison warden recruits women to fight injustice.' },
+        { title:'KGF Chapter 3', genre:'Action', language:'Kannada', duration:'2h 40m', rating:0, isUpcoming:true,
+          shows:[], timings:[],
+          pricing:{morning:150,afternoon:180,evening:210,night:250},
+          img:'', description:'The saga of Rocky continues in an epic final chapter.' },
       ]);
       console.log('🎬 Movies seeded');
     }
 
     if (!await Snack.countDocuments()) {
       await Snack.insertMany([
-        { name:'Popcorn (Large)',      emoji:'🍿', price:180, coinPrice:90,  category:'Snacks', img:'' },
-        { name:'Popcorn (Medium)',     emoji:'🍿', price:120, coinPrice:60,  category:'Snacks', img:'' },
-        { name:'Nachos + Cheese',      emoji:'🌮', price:150, coinPrice:75,  category:'Snacks', img:'' },
-        { name:'Hot Dog',              emoji:'🌭', price:130, coinPrice:65,  category:'Snacks', img:'' },
-        { name:'Veg Burger',           emoji:'🍔', price:110, coinPrice:55,  category:'Snacks', img:'' },
-        { name:'Chocolate Bar',        emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks', img:'' },
-        { name:'Pepsi (Large)',        emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks', img:'' },
-        { name:'Pepsi (Medium)',       emoji:'🥤', price:60,  coinPrice:30,  category:'Drinks', img:'' },
-        { name:'Water Bottle',         emoji:'💧', price:40,  coinPrice:20,  category:'Drinks', img:'' },
-        { name:'Fresh Lime Soda',      emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks', img:'' },
-        { name:'Combo (Popcorn+Pepsi)',emoji:'🎉', price:230, coinPrice:115, category:'Combos', img:'' },
-        { name:'Family Pack',          emoji:'🎊', price:450, coinPrice:225, category:'Combos', img:'' },
+        { name:'Popcorn (Large)',      emoji:'🍿', price:180, coinPrice:90,  category:'Snacks' },
+        { name:'Popcorn (Medium)',     emoji:'🍿', price:120, coinPrice:60,  category:'Snacks' },
+        { name:'Nachos + Cheese',      emoji:'🌮', price:150, coinPrice:75,  category:'Snacks' },
+        { name:'Hot Dog',              emoji:'🌭', price:130, coinPrice:65,  category:'Snacks' },
+        { name:'Veg Burger',           emoji:'🍔', price:110, coinPrice:55,  category:'Snacks' },
+        { name:'Chocolate Bar',        emoji:'🍫', price:70,  coinPrice:35,  category:'Snacks' },
+        { name:'Pepsi (Large)',        emoji:'🥤', price:90,  coinPrice:45,  category:'Drinks' },
+        { name:'Pepsi (Medium)',       emoji:'🥤', price:60,  coinPrice:30,  category:'Drinks' },
+        { name:'Water Bottle',         emoji:'💧', price:40,  coinPrice:20,  category:'Drinks' },
+        { name:'Fresh Lime Soda',      emoji:'🍋', price:80,  coinPrice:40,  category:'Drinks' },
+        { name:'Combo (Popcorn+Pepsi)',emoji:'🎉', price:230, coinPrice:115, category:'Combos' },
+        { name:'Family Pack',          emoji:'🎊', price:450, coinPrice:225, category:'Combos' },
       ]);
       console.log('🍿 Snacks seeded');
-    }
-
-    if (!await ParkingSlot.countDocuments()) {
-      const slots = [];
-      for(let i=1;i<=15;i++) slots.push({slotNumber:`A${i}`,block:'A',slotType:'Two-Wheeler', price:30,coinPrice:15});
-      for(let i=1;i<=12;i++) slots.push({slotNumber:`B${i}`,block:'B',slotType:'Four-Wheeler',price:60,coinPrice:30});
-      for(let i=1;i<=8; i++) slots.push({slotNumber:`C${i}`,block:'C',slotType:'Four-Wheeler',price:80,coinPrice:40});
-      for(let i=1;i<=5; i++) slots.push({slotNumber:`D${i}`,block:'D',slotType:'Disabled',    price:0, coinPrice:0 });
-      await ParkingSlot.insertMany(slots);
-      console.log('🅿️  Parking seeded');
     }
   } catch(e) { console.error('Seed error:', e.message); }
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
-app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID.slice(0,16)+'...' }));
-app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', razorpay: razorpay ? 'live' : 'simulated', keyId: RZP_KEY_ID }));
+app.get('/', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', payment:'simulated' }));
+app.get('/api', (req,res) => res.json({ status:'Cine Time API ✅', version:'9.0', payment:'simulated' }));
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 app.post('/api/register', async (req,res) => {
@@ -276,55 +252,50 @@ app.post('/api/register', async (req,res) => {
     const { username, password, email, phone } = req.body;
     if (!username || !password) return res.status(400).json({ error:'Username and password required' });
     if (await User.findOne({ username })) return res.status(400).json({ error:'Username already exists' });
-    await new User({ username, password, email, phone }).save();
-    res.status(201).json({ message:'Success' });
+    const user = new User({ username, password, email, phone, uuid: uuidv4() });
+    await user.save();
+    res.status(201).json({ message:'Success', uuid: user.uuid });
   } catch { res.status(400).json({ error:'Username already exists' }); }
 });
 
 app.post('/api/login', async (req,res) => {
   try {
     const { username, password } = req.body;
-    if (username==='admin' && password==='7777') return res.json({ user:'admin', role:'admin', cineCoins:0 });
+    if (username==='admin' && password==='7777') return res.json({ user:'admin', role:'admin', uuid:'admin', cineCoins:0, wallet:0 });
     const user = await User.findOne({ username, password });
-    if (user) return res.json({ user:user.username, role:'user', email:user.email||'', cineCoins:user.cineCoins||0 });
+    if (user) return res.json({ user:user.username, role:'user', uuid:user.uuid, email:user.email||'', cineCoins:user.cineCoins||0, wallet:user.wallet||0 });
     res.status(401).json({ error:'Invalid credentials' });
   } catch { res.status(500).json({ error:'Server error' }); }
 });
 
-app.get('/api/user/coins/:username', async (req,res) => {
-  try { res.json({ cineCoins: await getCoins(req.params.username) }); }
-  catch { res.json({ cineCoins:0 }); }
+app.get('/api/user/coins/:uuid', async (req,res) => {
+  try {
+    const u = await User.findOne({ uuid: req.params.uuid });
+    res.json({ cineCoins: u?.cineCoins||0, wallet: u?.wallet||0 });
+  } catch { res.json({ cineCoins:0, wallet:0 }); }
 });
 
 // ── SCREENS ───────────────────────────────────────────────────────────────────
 app.get('/api/screens', async (req,res) => {
   try {
     const screens = await Screen.find({ isActive:true }).sort({ name:1 });
-    console.log(`📡 GET /api/screens → ${screens.length} screens`);
     res.json(screens);
-  } catch(e) {
-    console.error('GET /api/screens error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/admin/screens', async (req,res) => {
   try {
-    const { name, rows, seatsPerRow, screenType } = req.body;
+    const { name, rows, seatsPerRow, screenType, basePrice } = req.body;
     if (!name?.trim()) return res.status(400).json({ error:'Screen name required' });
     const r   = parseInt(rows)        || 8;
     const spr = parseInt(seatsPerRow) || 10;
     const screen = await Screen.findOneAndUpdate(
       { name: name.trim() },
-      { name:name.trim(), rows:r, seatsPerRow:spr, capacity:r*spr, screenType:screenType||'Standard', isActive:true },
+      { name:name.trim(), rows:r, seatsPerRow:spr, capacity:r*spr, screenType:screenType||'Standard', basePrice:parseFloat(basePrice)||150, isActive:true },
       { new:true, upsert:true }
     );
-    console.log('✅ Screen saved:', screen.name);
     res.status(201).json(screen);
-  } catch(e) {
-    console.error('POST /api/admin/screens error:', e.message);
-    res.status(400).json({ error: e.message });
-  }
+  } catch(e) { res.status(400).json({ error: e.message }); }
 });
 
 app.put('/api/admin/screens/:id', async (req,res) => {
@@ -332,7 +303,7 @@ app.put('/api/admin/screens/:id', async (req,res) => {
     const r   = parseInt(req.body.rows)        || 8;
     const spr = parseInt(req.body.seatsPerRow) || 10;
     const sc  = await Screen.findByIdAndUpdate(req.params.id,
-      { name:req.body.name?.trim(), rows:r, seatsPerRow:spr, capacity:r*spr, screenType:req.body.screenType||'Standard' },
+      { name:req.body.name?.trim(), rows:r, seatsPerRow:spr, capacity:r*spr, screenType:req.body.screenType||'Standard', basePrice:parseFloat(req.body.basePrice)||150 },
       { new:true }
     );
     if (!sc) return res.status(404).json({ error:'Screen not found' });
@@ -347,76 +318,21 @@ app.delete('/api/admin/screens/:id', async (req,res) => {
   } catch { res.status(400).json({ error:'Failed' }); }
 });
 
-// ── RAZORPAY ─────────────────────────────────────────────────────────────────
-// ✅ FIXED: Always returns keyId so frontend uses the correct key
-app.post('/api/payment/create-order', async (req, res) => {
+// ── SIMULATED PAYMENT ─────────────────────────────────────────────────────────
+// The frontend handles the 2-second delay. Backend just issues a payment ID.
+app.post('/api/payment/simulate', async (req,res) => {
   try {
-    const amount = parseFloat(req.body.amount);
-    console.log(`💰 create-order: ₹${amount} | razorpay=${razorpay ? 'LIVE' : 'SIMULATED'} | key=${RZP_KEY_ID.slice(0,16)}...`);
-    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-
-    // Always return keyId so frontend can use it
-    if (!razorpay) {
-      return res.json({
-        orderId:   `order_SIM_${Date.now()}`,
-        amount:    Math.round(amount*100),
-        amountINR: amount,
-        currency:  'INR',
-        keyId:     RZP_KEY_ID,   // ✅ always present
-        simulated: true,
-        reason:    'Razorpay not initialized'
-      });
-    }
-
-    const order = await razorpay.orders.create({
-      amount:   Math.round(amount*100),
-      currency: req.body.currency || 'INR',
-      receipt:  req.body.receipt  || `rcpt_${Date.now()}`,
-      notes:    req.body.notes    || {},
-    });
-    console.log('✅ Real Razorpay order:', order.id);
-    return res.json({
-      orderId:   order.id,
-      amount:    order.amount,
-      amountINR: amount,
-      currency:  order.currency,
-      keyId:     RZP_KEY_ID,   // ✅ always present
-      simulated: false,
-    });
-  } catch (err) {
-    const msg = err.error?.description || err.message || 'Unknown';
-    console.error('❌ create-order error:', msg);
-    // Even on error, return a usable simulated order WITH keyId
-    return res.json({
-      orderId:   `order_SIM_${Date.now()}`,
-      amount:    Math.round((parseFloat(req.body.amount)||0)*100),
-      amountINR: parseFloat(req.body.amount)||0,
-      currency:  'INR',
-      keyId:     RZP_KEY_ID,   // ✅ always present
-      simulated: true,
-      reason:    msg,
-    });
-  }
-});
-
-app.post('/api/payment/verify', async (req,res) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature)
-      return res.status(400).json({ error:'Missing fields' });
-    if (razorpay_order_id.startsWith('order_SIM_') || razorpay_order_id.startsWith('order_FALLBACK_'))
-      return res.json({ success:true, simulated:true });
-    const expected = crypto.createHmac('sha256', RZP_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest('hex');
-    if (expected !== razorpay_signature)
-      return res.status(400).json({ success:false, error:'Signature mismatch' });
-    res.json({ success:true, paymentId:razorpay_payment_id });
-  } catch(e) { res.status(500).json({ error:'Verification failed: '+e.message }); }
+    const { amount } = req.body;
+    if (!amount || parseFloat(amount) <= 0) return res.status(400).json({ error:'Invalid amount' });
+    // Generate a deterministic sim payment ID
+    const payId = simPayId();
+    res.json({ success:true, simPaymentId: payId, amount: parseFloat(amount), message:'Simulated payment authorised' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── MOVIES ────────────────────────────────────────────────────────────────────
 app.get('/api/movies', async (req,res) => {
-  try { res.json(await Movie.find({ isActive:true }).sort({ createdAt:1 })); }
+  try { res.json(await Movie.find({ isActive:true }).sort({ isUpcoming:1, createdAt:1 })); }
   catch { res.json([]); }
 });
 
@@ -441,29 +357,28 @@ const buildShows = (shows, timings) => {
 
 app.post('/api/admin/movies', async (req,res) => {
   try {
-    const { title, genre, language, duration, rating, shows, timings, pricing, img, description } = req.body;
+    const { title, genre, language, duration, rating, shows, timings, pricing, img, description, isUpcoming } = req.body;
     if (!title?.trim()) return res.status(400).json({ error:'Title required' });
     const showsArr = buildShows(shows, timings);
     const movie = await Movie.findOneAndUpdate({ title:title.trim() },
       { title:title.trim(), genre, language, duration, rating:parseFloat(rating)||8.0,
         shows:showsArr, timings:showsArr.map(s=>s.time),
         pricing: pricing || { morning:120, afternoon:150, evening:180, night:200 },
-        img:img||'', description:description||'', isActive:true },
+        img:img||'', description:description||'', isActive:true, isUpcoming: isUpcoming||false },
       { new:true, upsert:true }
     );
-    console.log('✅ Movie saved:', movie.title);
     res.status(201).json(movie);
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
 app.put('/api/admin/movies/:id', async (req,res) => {
   try {
-    const { title, genre, language, duration, rating, shows, timings, pricing, img, description } = req.body;
+    const { title, genre, language, duration, rating, shows, timings, pricing, img, description, isUpcoming } = req.body;
     const showsArr = buildShows(shows, timings);
     const upd = { genre, language, duration, rating:parseFloat(rating)||8.0,
       shows:showsArr, timings:showsArr.map(s=>s.time),
       pricing: pricing || { morning:120, afternoon:150, evening:180, night:200 },
-      img:img||'', description:description||'', isActive:true };
+      img:img||'', description:description||'', isActive:true, isUpcoming: isUpcoming||false };
     if (title?.trim()) upd.title = title.trim();
     let saved = null;
     if (mongoose.Types.ObjectId.isValid(req.params.id))
@@ -475,23 +390,86 @@ app.put('/api/admin/movies/:id', async (req,res) => {
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
-// ✅ FIXED: Cascading delete — removes all Tickets & AdminBookings for the movie
+// ── TOGGLE UPCOMING ────────────────────────────────────────────────────────────
+app.put('/api/admin/movies/:id/toggle-upcoming', async (req,res) => {
+  try {
+    const movie = await Movie.findById(req.params.id);
+    if (!movie) return res.status(404).json({ error:'Movie not found' });
+    movie.isUpcoming = !movie.isUpcoming;
+    await movie.save();
+    res.json({ isUpcoming: movie.isUpcoming });
+  } catch(e) { res.status(400).json({ error:e.message }); }
+});
+
+// ── DELETE → ARCHIVE TO VAULT ──────────────────────────────────────────────────
 app.delete('/api/admin/movies/:id', async (req,res) => {
   try {
-    let movieTitle = null;
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      const m = await Movie.findByIdAndDelete(req.params.id);
-      movieTitle = m?.title || null;
-    }
-    if (movieTitle) {
-      const [td, ad] = await Promise.all([
-        Ticket.deleteMany({ movieName: movieTitle }),
-        AdminBooking.deleteMany({ movieName: movieTitle }),
-      ]);
-      console.log(`🗑 Cascading delete for "${movieTitle}": ${td.deletedCount} tickets, ${ad.deletedCount} admin bookings`);
-    }
-    res.json({ message:'Deleted', cascaded: movieTitle ? true : false });
-  } catch(e) { res.status(400).json({ error:'Delete failed: '+e.message }); }
+    const movie = await Movie.findById(req.params.id);
+    if (!movie) return res.status(404).json({ error:'Movie not found' });
+
+    // Aggregate stats before archiving
+    const [ticketAgg] = await Ticket.aggregate([
+      { $match:{ movieName: movie.title, status:'confirmed' } },
+      { $group:{ _id:null, totalRevenue:{ $sum:'$amount' }, totalTickets:{ $sum:{ $size:'$selectedSeats' } } } }
+    ]);
+    const [adminAgg] = await AdminBooking.aggregate([
+      { $match:{ movieName: movie.title } },
+      { $group:{ _id:null, totalRevenue:{ $sum:'$amount' }, totalTickets:{ $sum:{ $size:'$selectedSeats' } } } }
+    ]);
+
+    const totalRevenue = (ticketAgg?.totalRevenue||0) + (adminAgg?.totalRevenue||0);
+    const totalTickets = (ticketAgg?.totalTickets||0) + (adminAgg?.totalTickets||0);
+
+    // Archive to PastMovies
+    await PastMovie.create({
+      title:        movie.title,
+      genre:        movie.genre,
+      language:     movie.language,
+      duration:     movie.duration,
+      rating:       movie.rating,
+      pricing:      movie.pricing,
+      img:          movie.img,
+      description:  movie.description,
+      totalTickets,
+      totalRevenue,
+      originalId:   movie._id.toString(),
+    });
+
+    // Soft-delete
+    await Movie.findByIdAndDelete(req.params.id);
+    res.json({ message:'Archived to vault', totalRevenue, totalTickets });
+  } catch(e) { res.status(400).json({ error:e.message }); }
+});
+
+// ── MOVIE VAULT ───────────────────────────────────────────────────────────────
+app.get('/api/admin/vault', async (req,res) => {
+  try {
+    const { search } = req.query;
+    const query = search ? { title: { $regex: search, $options:'i' } } : {};
+    const past = await PastMovie.find(query).sort({ archivedAt:-1 });
+    res.json(past);
+  } catch(e) { res.status(500).json({ error:e.message }); }
+});
+
+// Restore from vault
+app.post('/api/admin/vault/:id/restore', async (req,res) => {
+  try {
+    const past = await PastMovie.findById(req.params.id);
+    if (!past) return res.status(404).json({ error:'Not found in vault' });
+    const movie = await Movie.create({
+      title:       past.title,
+      genre:       past.genre,
+      language:    past.language,
+      duration:    past.duration,
+      rating:      past.rating,
+      pricing:     past.pricing,
+      img:         past.img,
+      description: past.description,
+      isActive:    true,
+    });
+    await PastMovie.findByIdAndDelete(req.params.id);
+    res.json({ message:'Restored', movie });
+  } catch(e) { res.status(400).json({ error:e.message }); }
 });
 
 // ── SNACKS ────────────────────────────────────────────────────────────────────
@@ -528,130 +506,12 @@ app.delete('/api/admin/snacks/:id', async (req,res) => {
   } catch { res.status(400).json({ error:'Delete failed' }); }
 });
 
-// ── PARKING ───────────────────────────────────────────────────────────────────
-app.get('/api/parking', async (req,res) => {
-  try {
-    let slots = await ParkingSlot.find().sort({ slotNumber:1 });
-    if (!slots.length) {
-      const ns = [];
-      for(let i=1;i<=15;i++) ns.push({slotNumber:`A${i}`,block:'A',slotType:'Two-Wheeler', price:30,coinPrice:15});
-      for(let i=1;i<=12;i++) ns.push({slotNumber:`B${i}`,block:'B',slotType:'Four-Wheeler',price:60,coinPrice:30});
-      for(let i=1;i<=8; i++) ns.push({slotNumber:`C${i}`,block:'C',slotType:'Four-Wheeler',price:80,coinPrice:40});
-      for(let i=1;i<=5; i++) ns.push({slotNumber:`D${i}`,block:'D',slotType:'Disabled',    price:0, coinPrice:0 });
-      await ParkingSlot.insertMany(ns);
-      slots = await ParkingSlot.find().sort({ slotNumber:1 });
-    }
-    res.json(slots);
-  } catch { res.json([]); }
-});
-
-app.post('/api/parking/book', async (req,res) => {
-  try {
-    const { slotNumber, username, showTiming, movieName, paymentMethod, coinsUsed, razorpayOrderId, razorpayPaymentId } = req.body;
-    if (!slotNumber || !username) return res.status(400).json({ error:'slotNumber and username required' });
-    const slot = await ParkingSlot.findOne({ slotNumber });
-    if (!slot)       return res.status(404).json({ error:`Slot ${slotNumber} not found` });
-    if (slot.isBooked) return res.status(400).json({ error:`Slot ${slotNumber} already booked` });
-    let actualCoinsUsed = 0, coinsEarned = 0;
-    if (paymentMethod === 'coins') {
-      const needed = coinsUsed || slot.coinPrice;
-      const user = await User.findOne({ username });
-      if (!user || user.cineCoins < needed)
-        return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
-      await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:-needed } });
-      actualCoinsUsed = needed;
-    } else if (paymentMethod === 'offline') {
-      // ✅ Offline booking — no coins earned, no payment needed
-      coinsEarned = 0;
-    } else {
-      coinsEarned = slot.slotType !== 'Disabled' ? 5 : 0;
-      if (coinsEarned > 0) await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:coinsEarned } });
-    }
-    slot.isBooked   = true;
-    slot.bookedBy   = username;
-    slot.bookingDate = new Date();
-    slot.showTiming  = showTiming || '';
-    slot.movieName   = movieName  || 'General';
-    await slot.save();
-    await ParkingBooking.create({
-      username, slotNumber:slot.slotNumber, block:slot.block||slot.slotNumber.charAt(0),
-      slotType:slot.slotType, price:paymentMethod==='coins'?0:slot.price,
-      coinPrice:slot.coinPrice, coinsUsed:actualCoinsUsed, coinsEarned,
-      paymentMethod:paymentMethod||'razorpay',
-      razorpayOrderId:razorpayOrderId||null, razorpayPaymentId:razorpayPaymentId||null,
-      movieName:movieName||'General', showTiming:showTiming||'', status:'confirmed',
-    });
-    const newCoinBalance = await getCoins(username);
-    res.json({ message:'Parking booked', slot, coinsEarned, newCoinBalance });
-  } catch(e) { console.error('Parking book:', e); res.status(500).json({ error:'Booking failed: '+e.message }); }
-});
-
-app.post('/api/parking/release/:slotNumber', async (req,res) => {
-  try {
-    await ParkingSlot.findOneAndUpdate({ slotNumber:req.params.slotNumber },
-      { isBooked:false, bookedBy:null, bookingDate:null, showTiming:null, movieName:null });
-    res.json({ message:'Released' });
-  } catch { res.status(500).json({ error:'Release failed' }); }
-});
-
-app.delete('/api/admin/parking/reset', async (req,res) => {
-  try {
-    await ParkingSlot.updateMany({}, { isBooked:false, bookedBy:null, bookingDate:null, showTiming:null, movieName:null });
-    res.json({ message:'All released' });
-  } catch { res.status(500).json({ error:'Reset failed' }); }
-});
-
-// ✅ NEW: Admin offline parking booking (no payment gateway)
-app.post('/api/admin/parking/offline', async (req,res) => {
-  try {
-    const { slotNumber, username, showTiming, movieName, notes } = req.body;
-    if (!slotNumber || !username) return res.status(400).json({ error:'slotNumber and username required' });
-    const slot = await ParkingSlot.findOne({ slotNumber });
-    if (!slot)        return res.status(404).json({ error:`Slot ${slotNumber} not found` });
-    if (slot.isBooked) return res.status(400).json({ error:`Slot ${slotNumber} already booked` });
-    slot.isBooked    = true;
-    slot.bookedBy    = username;
-    slot.bookingDate = new Date();
-    slot.showTiming  = showTiming || '';
-    slot.movieName   = movieName  || 'General';
-    await slot.save();
-    await ParkingBooking.create({
-      username, slotNumber:slot.slotNumber, block:slot.block||slot.slotNumber.charAt(0),
-      slotType:slot.slotType, price:0, coinPrice:slot.coinPrice,
-      coinsUsed:0, coinsEarned:0, paymentMethod:'offline',
-      razorpayOrderId:null, razorpayPaymentId:null,
-      movieName:movieName||'General', showTiming:showTiming||'',
-      status:'confirmed',
-    });
-    res.json({ message:'Offline parking booked', slot });
-  } catch(e) { res.status(500).json({ error:'Offline parking failed: '+e.message }); }
-});
-
-// ✅ NEW: Admin offline snack order (no payment gateway)
-app.post('/api/admin/snacks/offline', async (req,res) => {
-  try {
-    const { username, items, total, notes } = req.body;
-    if (!username || !items?.length) return res.status(400).json({ error:'username and items required' });
-    const order = new RefreshmentOrder({
-      username, movieName:'Admin Offline', timing:'',
-      items: items.map(i=>({ name:i.name, qty:i.qty||1, price:i.price||0, coinPrice:i.coinPrice||0 })),
-      total: total || items.reduce((s,i)=>s+(i.price||0)*(i.qty||1),0),
-      coinsUsed:0, coinsEarned:0,
-      paymentMethod:'offline',
-      razorpayOrderId:null, razorpayPaymentId:null,
-      status:'confirmed',
-    });
-    await order.save();
-    res.status(201).json({ message:'Offline snack order placed', orderId:order._id });
-  } catch(e) { res.status(400).json({ error:'Offline snack order failed: '+e.message }); }
-});
-
 // ── BOOKED SEATS ──────────────────────────────────────────────────────────────
 app.get('/api/booked-seats/:movieName/:timing', async (req,res) => {
   try {
     const { movieName, timing } = req.params;
     const screenName = req.query.screen || '';
-    const q = { movieName, timing };
+    const q = { movieName, timing, status:'confirmed' };
     if (screenName) q.screenName = screenName;
     const [tickets, adminBks] = await Promise.all([Ticket.find(q), AdminBooking.find(q)]);
     let booked = [];
@@ -664,102 +524,137 @@ app.get('/api/booked-seats/:movieName/:timing', async (req,res) => {
 // ── BOOK TICKET ───────────────────────────────────────────────────────────────
 app.post('/api/book', async (req,res) => {
   try {
-    const { username, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, coinsUsed, paymentMethod, razorpayOrderId, razorpayPaymentId } = req.body;
-    if (!username || !movieName || !timing || !selectedSeats?.length)
+    const { userUUID, username, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, coinsUsed, paymentMethod, simPaymentId, isUpcoming } = req.body;
+    if (!userUUID || !username || !movieName || !timing || !selectedSeats?.length)
       return res.status(400).json({ error:'Missing required fields' });
+
     let actualCoinsUsed = 0, coinsEarned = 0;
     if (paymentMethod === 'coins') {
       const needed = 500 * selectedSeats.length;
-      const user = await User.findOne({ username });
+      const user = await User.findOne({ uuid: userUUID });
       if (!user || user.cineCoins < needed)
         return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
-      await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:-needed } });
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:-needed } });
       actualCoinsUsed = needed;
     } else {
       coinsEarned = selectedSeats.length * 10;
-      await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:coinsEarned } });
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:coinsEarned } });
     }
+
     let eTicketQR = null;
     try {
       eTicketQR = await qrcode.toDataURL(JSON.stringify({
-        app:'CINETIME', user:username, movie:movieName, timing,
-        screen:screenName||'', seats:selectedSeats.map(s=>s+1), txId:Date.now()
+        app:'CINETIME', uuid:userUUID, user:username, movie:movieName, timing,
+        screen:screenName||'', seats:selectedSeats.map(s=>s+1),
+        upcoming: isUpcoming||false, txId:simPaymentId||Date.now()
       }), { width:300, margin:2 });
     } catch(e) { console.error('QR error:', e.message); }
 
     const ticket = new Ticket({
-      username, movieName, timing, screenName:screenName||'',
+      userUUID, username, movieName, timing, screenName:screenName||'',
       rows:parseInt(rows)||8, seatsPerRow:parseInt(seatsPerRow)||10,
       selectedSeats: selectedSeats.map(s => parseInt(s)),
       amount: paymentMethod==='coins' ? 0 : (amount||0),
       coinsUsed:actualCoinsUsed, coinsEarned,
-      paymentMethod:paymentMethod||'razorpay',
-      razorpayOrderId:razorpayOrderId||null,
-      razorpayPaymentId:razorpayPaymentId||null,
+      paymentMethod:paymentMethod||'simulated',
+      simPaymentId:simPaymentId||null,
+      isUpcoming: isUpcoming||false,
       status:'confirmed', eTicketQR,
     });
     await ticket.save();
-    const newCoinBalance = await getCoins(username);
-    res.status(201).json({ message:'Booked', coinsEarned, eTicketQR, ticketId:ticket._id, newCoinBalance });
+    const user = await User.findOne({ uuid: userUUID });
+    res.status(201).json({ message:'Booked', coinsEarned, eTicketQR, ticketId:ticket._id, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
   } catch(e) { console.error('Book ticket:', e); res.status(500).json({ error:'Booking failed: '+e.message }); }
 });
 
-// ── HISTORY ───────────────────────────────────────────────────────────────────
-app.get('/api/history/:username', async (req,res) => {
+// ── CANCEL TICKET ─────────────────────────────────────────────────────────────
+app.post('/api/cancel-ticket/:ticketId', async (req,res) => {
   try {
-    const u = req.params.username;
-    const [tickets, adminBookings, refreshments, parking] = await Promise.all([
-      Ticket.find({ username:u }).sort({ date:-1 }),
-      AdminBooking.find({ username:u }).sort({ date:-1 }),
-      RefreshmentOrder.find({ username:u }).sort({ date:-1 }),
-      ParkingBooking.find({ username:u }).sort({ date:-1 }),
+    const { userUUID } = req.body;
+    const ticket = await Ticket.findById(req.params.ticketId);
+    if (!ticket) return res.status(404).json({ error:'Ticket not found' });
+    if (ticket.userUUID !== userUUID) return res.status(403).json({ error:'Not authorized' });
+    if (ticket.status === 'cancelled') return res.status(400).json({ error:'Already cancelled' });
+
+    ticket.status = 'cancelled';
+    ticket.cancelledAt = new Date();
+
+    // Refund logic
+    let refundAmount = 0;
+    if (ticket.paymentMethod === 'coins') {
+      // Refund coins
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins: ticket.coinsUsed } });
+    } else if (ticket.amount > 0) {
+      refundAmount = ticket.amount;
+      // Add refund to wallet
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ wallet: refundAmount } });
+    }
+    // Reclaim earned coins
+    if (ticket.coinsEarned > 0) {
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins: -ticket.coinsEarned } });
+    }
+    ticket.refundAmount = refundAmount;
+    await ticket.save();
+
+    const user = await User.findOne({ uuid: userUUID });
+    res.json({ message:'Cancelled', refundAmount, refundCoins: ticket.paymentMethod==='coins'?ticket.coinsUsed:0, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
+  } catch(e) { res.status(500).json({ error:'Cancellation failed: '+e.message }); }
+});
+
+// ── HISTORY (UUID-based) ──────────────────────────────────────────────────────
+app.get('/api/history/:uuid', async (req,res) => {
+  try {
+    const uuid = req.params.uuid;
+    const [tickets, adminBookings, refreshments] = await Promise.all([
+      Ticket.find({ userUUID:uuid }).sort({ date:-1 }),
+      AdminBooking.find({ userUUID:uuid }).sort({ date:-1 }),
+      RefreshmentOrder.find({ userUUID:uuid }).sort({ date:-1 }),
     ]);
-    res.json({ tickets, adminBookings, refreshments, parking });
-  } catch { res.json({ tickets:[], adminBookings:[], refreshments:[], parking:[] }); }
+    res.json({ tickets, adminBookings, refreshments });
+  } catch { res.json({ tickets:[], adminBookings:[], refreshments:[] }); }
 });
 
 // ── REFRESHMENTS ──────────────────────────────────────────────────────────────
 app.post('/api/refreshments/order', async (req,res) => {
   try {
-    const { username, total, paymentMethod, coinsUsed, razorpayOrderId, razorpayPaymentId } = req.body;
+    const { userUUID, username, total, paymentMethod, coinsUsed, simPaymentId } = req.body;
+    if (!userUUID) return res.status(400).json({ error:'userUUID required' });
     let actualCoinsUsed = 0, coinsEarned = 0;
     if (paymentMethod === 'coins') {
       const needed = coinsUsed || Math.ceil(total/2);
-      const user = await User.findOne({ username });
+      const user = await User.findOne({ uuid: userUUID });
       if (!user || user.cineCoins < needed)
         return res.status(400).json({ error:`Need ${needed} coins. You have ${user?.cineCoins||0}.` });
-      await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:-needed } });
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:-needed } });
       actualCoinsUsed = needed;
-    } else if (paymentMethod !== 'offline') {
+    } else {
       coinsEarned = 5;
-      await User.findOneAndUpdate({ username }, { $inc:{ cineCoins:5 } });
+      await User.findOneAndUpdate({ uuid: userUUID }, { $inc:{ cineCoins:5 } });
     }
     const order = new RefreshmentOrder({
-      ...req.body, coinsUsed:actualCoinsUsed, coinsEarned,
-      razorpayOrderId:razorpayOrderId||null, razorpayPaymentId:razorpayPaymentId||null,
-      status:'confirmed'
+      ...req.body, userUUID, coinsUsed:actualCoinsUsed, coinsEarned,
+      simPaymentId:simPaymentId||null, status:'confirmed'
     });
     await order.save();
-    const newCoinBalance = await getCoins(username);
-    res.status(201).json({ message:'Order placed', coinsEarned, orderId:order._id, newCoinBalance });
+    const user = await User.findOne({ uuid: userUUID });
+    res.status(201).json({ message:'Order placed', coinsEarned, orderId:order._id, newCoinBalance:user?.cineCoins||0, wallet:user?.wallet||0 });
   } catch(e) { res.status(400).json({ error:'Order failed: '+e.message }); }
 });
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
 app.get('/api/admin/all-bookings', async (req,res) => {
   try {
-    const [tickets, adminBookings, refreshments, parking] = await Promise.all([
+    const [tickets, adminBookings, refreshments] = await Promise.all([
       Ticket.find({}).sort({ date:-1 }).limit(500),
       AdminBooking.find({}).sort({ date:-1 }).limit(200),
       RefreshmentOrder.find({}).sort({ date:-1 }).limit(500),
-      ParkingBooking.find({}).sort({ date:-1 }).limit(200),
     ]);
-    res.json({ tickets, adminBookings, refreshments, parking });
-  } catch { res.json({ tickets:[], adminBookings:[], refreshments:[], parking:[] }); }
+    res.json({ tickets, adminBookings, refreshments });
+  } catch { res.json({ tickets:[], adminBookings:[], refreshments:[] }); }
 });
 
 app.get('/api/admin/users', async (req,res) => {
-  try { res.json(await User.find({}, 'username email phone cineCoins role').sort({ _id:-1 })); }
+  try { res.json(await User.find({}, 'uuid username email phone cineCoins wallet role').sort({ _id:-1 })); }
   catch { res.json([]); }
 });
 
@@ -767,11 +662,11 @@ app.get('/api/admin/detailed-seats/:movieName/:timing', async (req,res) => {
   try {
     const { movieName, timing } = req.params;
     const screenName = req.query.screen || '';
-    const q = { movieName, timing };
+    const q = { movieName, timing, status:'confirmed' };
     if (screenName) q.screenName = screenName;
     const [tickets, adminBks] = await Promise.all([Ticket.find(q), AdminBooking.find(q)]);
     const seatMap = {};
-    tickets.forEach(t  => t.selectedSeats.forEach(s => { seatMap[s] = { user:t.username,           type:'user',  method:t.paymentMethod }; }));
+    tickets.forEach(t  => t.selectedSeats.forEach(s => { seatMap[s] = { user:t.username, type:'user', method:t.paymentMethod }; }));
     adminBks.forEach(t => t.selectedSeats.forEach(s => { seatMap[s] = { user:t.username+' (Admin)', type:'admin' }; }));
     res.json(seatMap);
   } catch { res.json({}); }
@@ -789,12 +684,12 @@ app.delete('/api/admin/refresh/:movieName/:timing', async (req,res) => {
 
 app.post('/api/admin/book-direct', async (req,res) => {
   try {
-    const { username, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, notes } = req.body;
+    const { username, userUUID, movieName, timing, screenName, rows, seatsPerRow, selectedSeats, amount, notes, isUpcoming } = req.body;
     if (!username || !movieName || !timing || !selectedSeats?.length)
       return res.status(400).json({ error:'Missing fields' });
     const seats = selectedSeats.map(s => parseInt(s)-1).filter(n => !isNaN(n) && n >= 0);
     if (!seats.length) return res.status(400).json({ error:'No valid seats' });
-    const q = { movieName, timing };
+    const q = { movieName, timing, status:'confirmed' };
     if (screenName) q.screenName = screenName;
     const [ex, ax] = await Promise.all([Ticket.find(q), AdminBooking.find(q)]);
     const allBooked = [...ex.flatMap(t=>t.selectedSeats), ...ax.flatMap(t=>t.selectedSeats)];
@@ -808,36 +703,31 @@ app.post('/api/admin/book-direct', async (req,res) => {
       }), { width:300, margin:2 });
     } catch(e) { console.error('QR:', e.message); }
     const booking = new AdminBooking({
-      username, movieName, timing, screenName:screenName||'',
+      userUUID: userUUID||'admin', username, movieName, timing, screenName:screenName||'',
       rows:parseInt(rows)||8, seatsPerRow:parseInt(seatsPerRow)||10,
       selectedSeats:seats, amount:amount||0, notes:notes||'',
-      status:'confirmed', eTicketQR
+      isUpcoming:isUpcoming||false, status:'confirmed', eTicketQR
     });
     await booking.save();
     res.status(201).json({ message:'Booking created', bookingId:booking._id, eTicketQR });
   } catch(e) { res.status(500).json({ error:'Direct booking failed: '+e.message }); }
 });
 
-// ✅ FIXED: Analytics now sums Ticket + AdminBooking revenue, uses $unionWith for popular movies
 app.get('/api/admin/analytics', async (req,res) => {
   try {
-    const [tRev, pRev, sRev, adminRev, coins, tb, ab, tu] = await Promise.all([
-      Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
-      ParkingBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$price' } } }]),
+    const [tRev,sRev,tb,ab,tu] = await Promise.all([
+      Ticket.aggregate([{ $match:{ status:'confirmed' } },{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
       RefreshmentOrder.aggregate([{ $group:{ _id:null, total:{ $sum:'$total' } } }]),
-      AdminBooking.aggregate([{ $group:{ _id:null, total:{ $sum:'$amount' } } }]),
-      Ticket.aggregate([{ $group:{ _id:null, total:{ $sum:'$coinsEarned' } } }]),
-      Ticket.countDocuments(), AdminBooking.countDocuments(),
+      Ticket.countDocuments({ status:'confirmed' }),
+      AdminBooking.countDocuments(),
       User.countDocuments({ role:{ $ne:'admin' } }),
     ]);
-
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0,0,0,0);
     const fmt = '%m/%d';
-    const [tD, pD, sD] = await Promise.all([
-      Ticket.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$amount' }, bookings:{ $sum:1 } } }]),
-      ParkingBooking.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$price' } } }]),
+    const [tD,sD] = await Promise.all([
+      Ticket.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo }, status:'confirmed' } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$amount' }, bookings:{ $sum:1 } } }]),
       RefreshmentOrder.aggregate([{ $match:{ date:{ $gte:sevenDaysAgo } } },{ $group:{ _id:{ $dateToString:{ format:fmt, date:'$date' } }, revenue:{ $sum:'$total' } } }]),
     ]);
     const dailyRevenue = [];
@@ -847,43 +737,22 @@ app.get('/api/admin/analytics', async (req,res) => {
       const label = `${d.getMonth()+1}/${d.getDate()}`;
       dailyRevenue.push({
         date:     label,
-        revenue:  (tD.find(r=>r._id===label)?.revenue||0) + (pD.find(r=>r._id===label)?.revenue||0) + (sD.find(r=>r._id===label)?.revenue||0),
+        revenue:  (tD.find(r=>r._id===label)?.revenue||0) + (sD.find(r=>r._id===label)?.revenue||0),
         bookings: tD.find(r=>r._id===label)?.bookings||0,
       });
     }
-
-    // ✅ Popular movies: union of Ticket + AdminBooking collections
-    let movieStats = [];
-    try {
-      movieStats = await Ticket.aggregate([
-        { $project: { movieName:1, amount:1 } },
-        { $unionWith: { coll:'adminbookings', pipeline:[{ $project:{ movieName:1, amount:1 } }] } },
-        { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
-        { $sort:{ count:-1 } },
-        { $limit:5 },
-      ]);
-    } catch(e) {
-      // Fallback if $unionWith not supported (MongoDB < 4.4)
-      movieStats = await Ticket.aggregate([
-        { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
-        { $sort:{ count:-1 } }, { $limit:5 }
-      ]);
-    }
-
-    const ticketRev   = tRev[0]?.total   || 0;
-    const adminBkRev  = adminRev[0]?.total || 0;
-    const parkRev     = pRev[0]?.total    || 0;
-    const snackRev    = sRev[0]?.total    || 0;
-
+    const movieStats = await Ticket.aggregate([
+      { $match:{ status:'confirmed' } },
+      { $group:{ _id:'$movieName', count:{ $sum:1 }, revenue:{ $sum:'$amount' } } },
+      { $sort:{ count:-1 } }, { $limit:5 }
+    ]);
     res.json({
-      totalRevenue:       ticketRev + adminBkRev + parkRev + snackRev,
-      ticketRevenue:      ticketRev + adminBkRev,  // ✅ includes admin bookings
-      parkingRevenue:     parkRev,
-      refreshmentRevenue: snackRev,
+      totalRevenue:       (tRev[0]?.total||0) + (sRev[0]?.total||0),
+      ticketRevenue:      tRev[0]?.total||0,
+      refreshmentRevenue: sRev[0]?.total||0,
       totalBookings:      tb,
       totalAdminBookings: ab,
       totalUsers:         tu,
-      coinsIssued:        coins[0]?.total || 0,
       dailyRevenue,
       movieStats,
     });
@@ -897,12 +766,14 @@ app.post('/api/chatbot', async (req,res) => {
     const movies = await Movie.find({ isActive:true });
     const lower  = message.toLowerCase();
     let reply;
-    if      (lower.includes('movie') || lower.includes('showing')) reply = `Now showing: ${movies.map(m=>m.title).join(', ')} 🎬`;
-    else if (lower.includes('price') || lower.includes('ticket'))  reply = '🎟 Morning ₹120 · Afternoon ₹150 · Evening ₹180 · Night ₹200. Or 500 CineCoins!';
-    else if (lower.includes('coin'))                               reply = '🪙 Earn 10 coins/ticket, 5/snack, 5/parking. 500 coins = free ticket!';
-    else if (lower.includes('parking'))                            reply = '🅿️ Block A ₹30 · B ₹60 · C ₹80 · D Free. +5🪙 via Razorpay!';
-    else if (lower.includes('snack') || lower.includes('food'))    reply = '🍿 Popcorn, Nachos, Combos and more!';
-    else reply = "Thanks for asking! I'm CineBot 🎬 Ask about movies, prices or CineCoins!";
+    if      (lower.includes('upcoming'))                             reply = `🎬 Coming soon: ${movies.filter(m=>m.isUpcoming).map(m=>m.title).join(', ')||'Nothing announced yet!'}`;
+    else if (lower.includes('movie') || lower.includes('showing'))  reply = `Now showing: ${movies.filter(m=>!m.isUpcoming).map(m=>m.title).join(', ')} 🎬`;
+    else if (lower.includes('price') || lower.includes('ticket'))   reply = '🎟 Morning ₹120 · Afternoon ₹150 · Evening ₹180 · Night ₹200. Or 500 CineCoins!';
+    else if (lower.includes('coin'))                                 reply = '🪙 Earn 10 coins/ticket, 5/snack. 500 coins = free ticket!';
+    else if (lower.includes('cancel'))                               reply = '❌ You can cancel tickets from "My Bookings". Refunds go to your CineWallet.';
+    else if (lower.includes('wallet') || lower.includes('refund'))  reply = '💰 Refunds land in your CineWallet instantly. Reuse for future bookings!';
+    else if (lower.includes('snack') || lower.includes('food'))     reply = '🍿 Popcorn, Nachos, Combos and more at the Snack Bar!';
+    else reply = "Thanks for asking! I'm CineBot 🎬 Ask about movies, prices, CineCoins or cancellations!";
     res.json({ reply });
   } catch { res.json({ reply:"Having trouble 🤖" }); }
 });
@@ -911,6 +782,6 @@ app.post('/api/chatbot', async (req,res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Cine Time v9.0 on port ${PORT}`);
-  console.log(`🔑 Razorpay: ${razorpay ? 'LIVE — ' + RZP_KEY_ID : 'SIMULATED MODE'}`);
+  console.log(`💳 Payment: Simulated Mode (no gateway required)`);
   console.log(`🍃 MongoDB:  ${mongoURI.includes('localhost') ? 'Local' : 'Atlas'}`);
 });
